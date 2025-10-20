@@ -457,13 +457,13 @@ The scenario described in this section is when an Agent sends a message to anoth
 
 - Point-to-Point Communication (P2P):
 
-- In the direct communication mode, the Agent looks up the corresponding IP address using the recipient's ID, thus allowing the message to be sent to the recipient.
+	- In the direct communication mode, the Agent looks up the corresponding IP address using the recipient's ID, thus allowing the message to be sent to the recipient.
 
-- In the indirect communication mode, the Agent can delegate the ID lookup task to the Agent Communication Server, which is then responsible for sending the message to the recipient Agent based on the ID.
+	- In the indirect communication mode, the Agent can delegate the ID lookup task to the Agent Communication Server, which is then responsible for sending the message to the recipient Agent based on the ID.
 
 - Group Communication:
 
-- The Agent delegates the Group ID lookup task to the Agent Communication Server, which is then responsible for sending the message to the recipient Agent in the same group.
+	- The Agent delegates the Group ID lookup task to the Agent Communication Server, which is then responsible for sending the message to the recipient Agent in the same group.
 
 ## Semantic-based Route resolution
 
