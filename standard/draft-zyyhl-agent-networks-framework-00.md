@@ -130,10 +130,10 @@ The server enables Agents to communicate and collaborate with each other, which 
 
 ~~~
 +------+                           +-------------+                            +------+
-|      |                           |             |<-(A)-Capability Register---|      |
+|      |                           |             |<-(A)----Agent Register-----|      |
 |      |                           |             |                            |      |
 |      |                           |    Agent    |-(B)-------Response-------->|      |
-|      |-(C)-Capability Discover-->| Registration|                            |      |
+|      |-(C)----Agent Discovery--->| Registration|                            |      |
 |      |                           |    Server   |                            |      |
 |      |<-(D)----Matched Agents----|             |                            |      |
 |  AI  |                           |             |                            |  AI  |
@@ -160,7 +160,7 @@ The abstract flow illustrated in Figure 1 describes the interaction between the 
 
 (B)  The Agent Registration Server authenticates the AI Agent B’s capabilities and then stores them, e.g., in its local database.
 
-(C)  AI Agent A initiates a capability discover request to the Agent Registration Server, the request includes the intent, task or other information.
+(C)  AI Agent A initiates a agent discovery request to the Agent Registration Server, the request includes the intent, task or other information.
 
 (D)  The Agent Registration Server matches the intent or task with the capabilities stored in its local database, and responses with matched AI Agents list to the AI Agent A.
 
@@ -279,7 +279,7 @@ Agent Registration Includes the Following Two Modes:
 
 ## Self-Declaration Mode
 
-In this mode, intelligent agents interconnect externally provided resources (including information, interfaces, etc.) using Linked-Data technologies, forming a networked ecosystem through agent description documents. Other agents can selectively retrieve appropriate resources via metadata described in these agent profile documents. Advantages of the Self-Declaration Mode:
+In this mode, AI agents interconnect externally provided resources (including information, interfaces, etc.) using Linked-Data technologies, forming a networked ecosystem through agent description documents. Other AI agents can selectively retrieve appropriate resources via metadata described in these agent profile documents. Advantages of the Self-Declaration Mode:
 
 - Compatibility with Existing Internet Architecture: Facilitates search engine indexing of agent-publicized information, enabling the creation of an efficient agent data network.
 
@@ -290,7 +290,7 @@ In this mode, intelligent agents interconnect externally provided resources (inc
 
 ## Centralized Registration Mode
 
-In this mode, the AI Agents register their attributes to a centralized Agent Registration Server. The parameters that an Agent needs to register in a trust domain (step A in Figure 1) may include:
+In this mode, the AI agents register their attributes to a centralized Agent Registration Server. The parameters that an AI agent needs to register in a trust domain (step A in Figure 1) may include:
 
 - Name: The name of the Agent, which may not be unique and typically represented as a string.
 
@@ -323,7 +323,7 @@ In this operational mode, AI agents dynamically acquire Agent Description (AD) d
 
 ## Centralized Query Mode (Corresponding to Centralized Registration Mode)
 
-In the mode, the discovery of AI agents depends on the Agent Registration Server, and the discovery process consists of two phases: "query matching" and "result feedback":
+In this mode, the discovery of AI agents depends on the Agent Registration Server, and the discovery process consists of two phases: "query matching" and "result feedback":
 
 1) Query Matching Phase: 
 
@@ -350,11 +350,11 @@ The Agent Registration Server feeds back the matched results to the initiator AI
 
 The core function of a task is to enable the AI agents involved in the communication to agree on "what to do", thereby avoiding collaboration failures due to misunderstandings.
 
-Tasks can be used in capability discovery and communication procedures:
+Tasks can be used in agent discovery and communication procedures:
 
-- Capability Discovery: Obtaining AI agents with matching capabilities based on the task descriptions.
+- Agent Discovery: Obtaining AI agents with matching capabilities based on the task descriptions.
 
-- Communication: When a Coordinator Agent initiates a communication request to an Execution Agent, the request message may carry a task description. In addition, other auxiliary information such as images, videos, files, can also be sent along with the task description to help accomplish the task.
+- Communication: When a Coordinator Agent (e.g., Agent A) initiates a communication request to an Execution Agent (e.g., Agent B), the request message may carry a task description. In addition, other auxiliary information such as images, videos, files, can also be sent along with the task description to help accomplish the task.
 
 An example as shown in Figure 2, a task can be executed by an AI agent (e.g., task0 sent to Agent B). When a complex task is received by an AI agent, this task can be broken down into a series of subtasks (e.g., task0 broken down to sub-task1 and sub-task2) with a clear execution sequence, known as a task chain, and executed by a group of AI agents (e.g., sub-task1 sent to Agent B, sub-task2 sent to Agent C). Task chain allows multiple AI agents to execute different tasks in a specific sequence based on policy, and enable multiple AI agents collaboratively to accomplish a complex task. The Agent communication protocol should support to encapsulate the task chain information, e.g., independent with the underlying network transport (e.g., IP, MPLS).
 
@@ -427,13 +427,13 @@ In this mode, the AI agent sending the information does not know which AI agents
 
 # Multimodality
 
-Interactions between AI agents must support multimodality, e.g., text, file, document, image, structured data, real-time audio stream, video streaming. The data size of different multimodality as well as the transmission modes (e.g., real-time steaming, or push notification) may be different.
+Interactions between AI agents must support multimodality, e.g., text, file, document, image, structured data, real-time audio/video stream. The data size of different multimodality as well as the transmission modes (e.g., real-time stream, or push notification) may be different.
 
 Given these traffic characteristics above, the Agent communication protocol should support multimodal data transmission which mentioned above. At the same time, the Agent communication protocol and possible protocols of other layers should be designed with the principle that the multimodal data can be distinguished and aware, based on which they can be handled with differentiated policies for better performance assurance and resource efficiency. For example, different multimodal data can be transmitted with different transport streams of different quality guarantee. Or, they can be transmitted within a same transport stream but with different policies (e.g., transmission priority).
 
 # Session management
 
-After discovering the peer Agent (e.g., Agent B), the local Agent (e.g., Agent A) needs to establish a session with it to communicate. 
+After discovering the Execution Agent (e.g., Agent B), the Coordinator Agent (e.g., Agent A) needs to establish a session with it to communicate. 
 
 ## Session Establishment and Control
 
@@ -443,7 +443,7 @@ Therefore, the Agent Communication Server needs to support the states maintenanc
 
 In order to communicate with Agent B, Agent A initiates a session establishment request to the Agent Communication Server. After verifying its permissions, the Agent Communication Server proceeds to establish the session, for example, by assigning a globally unique Session ID to the new session. This ID will be used throughout the entire session lifecycle to correlate all activities and data. Correspondingly, the Agent Communication Server needs to maintain a session table, which includes information about all Agents involved in the session, especially information about the session initiator.
 
-Alternately, after authentication and authorization, the  Agent A can also initial a connection directly to the Agent B. In this situation, the control plane and data plane can be separated.
+Alternately, after authentication and authorization, the Agent A can also initial a connection directly to the Agent B. In this situation, the control plane and data plane can be separated.
 
 ## Differentiated QoS Guarantees
 
@@ -535,7 +535,7 @@ TBD.
 # Conclusions
 
 This framework focuses on AI agent communication within a single trust domain, introducing the communication framework, basic processes, and key mechanisms.
-Considering that multiple trust domains may exist in practical deployments, the mechanisms such as digital identity format, capability registration and discovery, and routing involved in cross-domain scenarios may differ from those within a single trust domain. Therefore, further research on cross-domain agent communication is needed in the future.
+Considering that multiple trust domains may exist in practical deployments, the mechanisms such as digital identity format, agent registration and discovery, and routing involved in cross-domain scenarios may differ from those within a single trust domain. Therefore, further research on cross-domain agent communication is needed in the future.
 
 # Acknowledgements
 
