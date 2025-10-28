@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="650" viewBox="0 0 900 650">
+  <defs>
+    <style type="text/css">
+      .title { font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; fill: #1a1a1a; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333; }
+      .label { font-family: Arial, sans-serif; font-size: 12px; fill: #444; }
+      .small-label { font-family: Arial, sans-serif; font-size: 10px; fill: #666; }
+      .box { fill: #ffffff; stroke: #333333; stroke-width: 2; }
+      .central-box { fill: #e3f2fd; stroke: #1976d2; stroke-width: 3; }
+      .component-box { fill: #f5f5f5; stroke: #666666; stroke-width: 1.5; }
+      .sub-registry { fill: #fff9c4; stroke: #f57f17; stroke-width: 2; stroke-dasharray: 5,5; }
+      .arrow { stroke: #333333; stroke-width: 2; fill: none; }
+      .arrow-bi { stroke: #666666; stroke-width: 1.5; fill: none; }
+      .auth-arrow { stroke: #4caf50; stroke-width: 1.5; fill: none; stroke-dasharray: 4,4; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0,0 10,3 0,6" fill="#333333"/>
+    </marker>
+    <marker id="arrowhead-bi" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0,0 10,3 0,6" fill="#666666"/>
+    </marker>
+    <marker id="arrowhead-auth" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0,0 10,3 0,6" fill="#4caf50"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="900" height="650" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" class="title">MCP Registry Architecture</text>
+
+  <!-- Server Publishers Section -->
+  <g id="publishers">
+    <rect x="30" y="80" width="160" height="80" rx="5" class="box"/>
+    <text x="110" y="110" text-anchor="middle" class="subtitle">Server Maintainers</text>
+    <text x="110" y="130" text-anchor="middle" class="label">Publish MCP Servers</text>
+    <text x="110" y="148" text-anchor="middle" class="small-label">with server.json</text>
+  </g>
+
+  <!-- Authentication Methods -->
+  <g id="auth">
+    <rect x="30" y="185" width="160" height="110" rx="5" class="component-box"/>
+    <text x="110" y="210" text-anchor="middle" class="subtitle">Authentication</text>
+    <text x="110" y="230" text-anchor="middle" class="small-label">GitHub OAuth</text>
+    <text x="110" y="248" text-anchor="middle" class="small-label">GitHub OIDC</text>
+    <text x="110" y="266" text-anchor="middle" class="small-label">DNS Verification</text>
+    <text x="110" y="284" text-anchor="middle" class="small-label">HTTP Verification</text>
+  </g>
+
+  <!-- Publisher CLI -->
+  <g id="cli">
+    <rect x="30" y="320" width="160" height="70" rx="5" class="component-box"/>
+    <text x="110" y="345" text-anchor="middle" class="subtitle">Publisher CLI</text>
+    <text x="110" y="365" text-anchor="middle" class="small-label">mcp-publisher tool</text>
+    <text x="110" y="383" text-anchor="middle" class="small-label">Command line interface</text>
+  </g>
+
+  <!-- Central Registry -->
+  <g id="central-registry">
+    <rect x="270" y="130" width="360" height="330" rx="8" class="central-box"/>
+    <text x="450" y="160" text-anchor="middle" class="title">MCP Registry</text>
+    <text x="450" y="180" text-anchor="middle" class="small-label">Single Source of Truth</text>
+    <text x="450" y="195" text-anchor="middle" class="small-label">registry.modelcontextprotocol.io</text>
+    
+    <!-- Core Components Grid -->
+    <rect x="290" y="210" width="150" height="55" rx="4" class="component-box"/>
+    <text x="365" y="233" text-anchor="middle" class="label">API Layer</text>
+    <text x="365" y="250" text-anchor="middle" class="small-label">REST API v0</text>
+    
+    <rect x="460" y="210" width="150" height="55" rx="4" class="component-box"/>
+    <text x="535" y="233" text-anchor="middle" class="label">Service Layer</text>
+    <text x="535" y="250" text-anchor="middle" class="small-label">Business Logic</text>
+    
+    <rect x="290" y="280" width="150" height="55" rx="4" class="component-box"/>
+    <text x="365" y="303" text-anchor="middle" class="label">Validators</text>
+    <text x="365" y="320" text-anchor="middle" class="small-label">Schema Validation</text>
+    
+    <rect x="460" y="280" width="150" height="55" rx="4" class="component-box"/>
+    <text x="535" y="303" text-anchor="middle" class="label">Auth &amp; Security</text>
+    <text x="535" y="320" text-anchor="middle" class="small-label">Namespace Control</text>
+    
+    <rect x="290" y="350" width="150" height="55" rx="4" class="component-box"/>
+    <text x="365" y="373" text-anchor="middle" class="label">Database</text>
+    <text x="365" y="390" text-anchor="middle" class="small-label">PostgreSQL</text>
+    
+    <rect x="460" y="350" width="150" height="55" rx="4" class="component-box"/>
+    <text x="535" y="373" text-anchor="middle" class="label">Telemetry</text>
+    <text x="535" y="390" text-anchor="middle" class="small-label">Metrics &amp; Monitoring</text>
+  </g>
+
+  <!-- Community Moderation -->
+  <g id="moderation">
+    <rect x="270" y="485" width="360" height="65" rx="5" class="component-box"/>
+    <text x="450" y="510" text-anchor="middle" class="subtitle">Community Moderation</text>
+    <text x="450" y="530" text-anchor="middle" class="small-label">Issue Reporting • Denylist Management</text>
+    <text x="450" y="545" text-anchor="middle" class="small-label">Guideline Enforcement</text>
+  </g>
+
+  <!-- MCP Clients -->
+  <g id="clients">
+    <rect x="710" y="80" width="160" height="80" rx="5" class="box"/>
+    <text x="790" y="110" text-anchor="middle" class="subtitle">MCP Clients</text>
+    <text x="790" y="130" text-anchor="middle" class="label">Access Server Data</text>
+    <text x="790" y="148" text-anchor="middle" class="small-label">via Registry API</text>
+  </g>
+
+  <!-- Public Sub-Registries -->
+  <g id="public-sub">
+    <rect x="680" y="220" width="190" height="90" rx="5" class="sub-registry"/>
+    <text x="775" y="245" text-anchor="middle" class="subtitle">Public Sub-Registries</text>
+    <text x="775" y="265" text-anchor="middle" class="small-label">MCP Marketplaces</text>
+    <text x="775" y="280" text-anchor="middle" class="small-label">Enhanced Metadata</text>
+    <text x="775" y="295" text-anchor="middle" class="small-label">Opinionated Curation</text>
+  </g>
+
+  <!-- Private Sub-Registries -->
+  <g id="private-sub">
+    <rect x="680" y="330" width="190" height="90" rx="5" class="sub-registry"/>
+    <text x="775" y="355" text-anchor="middle" class="subtitle">Private Sub-Registries</text>
+    <text x="775" y="375" text-anchor="middle" class="small-label">Enterprise Deployments</text>
+    <text x="775" y="390" text-anchor="middle" class="small-label">Custom Security Policies</text>
+    <text x="775" y="405" text-anchor="middle" class="small-label">Privacy Requirements</text>
+  </g>
+
+  <!-- Arrows and Connections -->
+  <!-- Publisher to Auth -->
+  <path d="M 110,160 L 110,185" class="auth-arrow" marker-end="url(#arrowhead-auth)"/>
+  
+  <!-- Auth to Registry -->
+  <path d="M 190,240 L 270,240" class="auth-arrow" marker-end="url(#arrowhead-auth)"/>
+  
+  <!-- CLI to Registry -->
+  <path d="M 190,355 L 270,300" class="arrow" marker-end="url(#arrowhead)"/>
+  
+  <!-- Registry to Clients -->
+  <path d="M 630,200 L 710,120" class="arrow" marker-end="url(#arrowhead)"/>
+  
+  <!-- Registry to Public Sub-Registry -->
+  <path d="M 630,265 L 680,265" class="arrow-bi" marker-end="url(#arrowhead-bi)"/>
+  
+  <!-- Registry to Private Sub-Registry -->
+  <path d="M 630,375 L 680,375" class="arrow-bi" marker-end="url(#arrowhead-bi)"/>
+  
+  <!-- Community to Registry -->
+  <path d="M 450,485 L 450,460" class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="20" y="560" width="860" height="75" rx="5" fill="#ffffff" stroke="#cccccc" stroke-width="1"/>
+    <text x="35" y="583" class="label">Legend:</text>
+    
+    <line x1="90" y1="578" x2="140" y2="578" class="arrow" marker-end="url(#arrowhead)"/>
+    <text x="145" y="583" class="small-label">Data Flow</text>
+    
+    <line x1="90" y1="598" x2="140" y2="598" class="arrow-bi" marker-end="url(#arrowhead-bi)"/>
+    <text x="145" y="603" class="small-label">Bi-directional Sync</text>
+    
+    <line x1="90" y1="618" x2="140" y2="618" class="auth-arrow" marker-end="url(#arrowhead-auth)"/>
+    <text x="145" y="623" class="small-label">Authentication Flow</text>
+    
+    <rect x="260" y="573" width="50" height="15" class="sub-registry"/>
+    <text x="315" y="583" class="small-label">Sub-Registry</text>
+    
+    <rect x="260" y="593" width="50" height="15" class="central-box"/>
+    <text x="315" y="603" class="small-label">Main Registry</text>
+    
+    <rect x="260" y="613" width="50" height="15" class="component-box"/>
+    <text x="315" y="623" class="small-label">Component</text>
+    
+    <text x="420" y="583" class="small-label">Features: Open Source • MIT License</text>
+    <text x="420" y="603" class="small-label">Built with: Go • PostgreSQL • OpenAPI</text>
+    <text x="420" y="623" class="small-label">Deployment: Pulumi IaC</text>
+  </g>
+</svg>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="900" height="800" xmlns="http://www.w3.org/2000/svg">
+    <!-- 定义渐变和样式 -->
+    <defs>
+        <!-- 被动发现背景渐变 -->
+        <linearGradient id="passiveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#f3e5f5;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#e1bee7;stop-opacity:1" />
+        </linearGradient>
+        
+        <!-- 组件渐变 -->
+        <linearGradient id="componentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#f5f5f5;stop-opacity:1" />
+        </linearGradient>
+        
+        <!-- 箭头定义 -->
+        <marker id="arrowPurple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L10,3.5 L0,7 Z" fill="#6f42c1" />
+        </marker>
+        <marker id="arrowOrange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L10,3.5 L0,7 Z" fill="#fd7e14" />
+        </marker>
+
+        <!-- 文本样式 -->
+        <style type="text/css">
+            .title { font: bold 24px sans-serif; fill: #212529; }
+            .subtitle { font: bold 18px sans-serif; fill: #343a40; }
+            .label { font: 14px sans-serif; fill: #495057; }
+            .arrow-label { font: 12px sans-serif; fill: #6f42c1; font-weight: bold; }
+            .small-label { font: 10px sans-serif; fill: #6c757d; }
+            .box-text { font: 14px sans-serif; fill: #212529; text-anchor: middle; }
+            .icon-text { font: 12px sans-serif; fill: #212529; text-anchor: middle; }
+            .description-text { font: 12px sans-serif; fill: #495057; }
+        </style>
+    </defs>
+
+    <!-- 背景 -->
+    <rect x="0" y="0" width="900" height="800" fill="url(#passiveGradient)" />
+
+    <!-- 主标题 -->
+    <text x="450" y="50" class="title" text-anchor="middle">ANP 被动发现机制 (ANP Passive Discovery Mechanism)</text>
+
+    <!-- 流程图容器 -->
+    <rect x="50" y="80" width="800" height="500" rx="15" ry="15" fill="rgba(255,255,255,0.8)" stroke="#6f42c1" stroke-width="2" />
+
+    <!-- 智能体 -->
+    <rect x="100" y="150" width="180" height="100" rx="10" ry="10" fill="url(#componentGradient)" stroke="#6f42c1" stroke-width="1.5" />
+    <path d="M180 170 L190 180 L180 190 L170 180 Z M185 175 L185 185 M175 185 L185 185 M175 175 L185 175" fill="none" stroke="#6f42c1" stroke-width="2"/>
+    <circle cx="180" cy="180" r="20" fill="none" stroke="#6f42c1" stroke-width="2"/>
+    <line x1="180" y1="195" x2="180" y2="205" stroke="#6f42c1" stroke-width="2"/>
+    <text x="190" y="215" class="box-text">智能体</text>
+    <text x="190" y="235" class="small-label">Agent</text>
+
+    <!-- 搜索服务智能体 -->
+    <rect x="620" y="150" width="180" height="100" rx="10" ry="10" fill="url(#componentGradient)" stroke="#fd7e14" stroke-width="1.5" />
+    <path d="M680 170 L690 180 L680 190 L670 180 Z M685 175 L685 185 M675 185 L685 185 M675 175 L685 175" fill="none" stroke="#fd7e14" stroke-width="2"/>
+    <circle cx="680" cy="180" r="20" fill="none" stroke="#fd7e14" stroke-width="2"/>
+    <line x1="680" y1="195" x2="680" y2="205" stroke="#fd7e14" stroke-width="2"/>
+    <text x="710" y="215" class="box-text">搜索服务智能体</text>
+    <text x="710" y="235" class="small-label">Search Service Agent</text>
+
+    <!-- 注册请求 -->
+    <line x1="280" y1="200" x2="620" y2="200" stroke="#6f42c1" stroke-width="2" marker-end="url(#arrowPurple)" />
+    <text x="450" y="190" class="arrow-label">注册请求</text>
+
+    <!-- 智能体描述文档 -->
+    <rect x="360" y="320" width="180" height="100" rx="10" ry="10" fill="url(#componentGradient)" stroke="#6f42c1" stroke-width="1.5" />
+    <path d="M380 340 L390 340 L390 350 L380 350 Z M385 345 L385 360" fill="none" stroke="#6f42c1" stroke-width="2"/>
+    <text x="450" y="380" class="box-text">智能体描述文档</text>
+    <text x="450" y="400" class="small-label">ad.json</text>
+
+    <!-- 注册API -->
+    <line x1="450" y1="250" x2="450" y2="320" stroke="#6f42c1" stroke-width="2" marker-end="url(#arrowPurple)" />
+    <text x="450" y="285" class="arrow-label" text-anchor="middle">注册API</text>
+
+    <!-- 索引服务 -->
+    <rect x="620" y="490" width="180" height="100" rx="10" ry="10" fill="url(#componentGradient)" stroke="#fd7e14" stroke-width="1.5" />
+    <path d="M680 510 L690 510 L690 520 L680 520 Z M685 515 L685 530" fill="none" stroke="#fd7e14" stroke-width="2"/>
+    <text x="710" y="550" class="box-text">索引服务</text>
+    <text x="710" y="570" class="small-label">Indexing Service</text>
+
+    <!-- 爬取/索引 -->
+    <line x1="710" y1="250" x2="710" y2="490" stroke="#fd7e14" stroke-width="2" marker-end="url(#arrowOrange)" />
+    <text x="710" y="370" class="arrow-label" text-anchor="middle">爬取/索引</text>
+
+    <!-- 底部说明 -->
+    <rect x="50" y="600" width="800" height="180" rx="15" ry="15" fill="rgba(255,255,255,0.8)" stroke="#6f42c1" stroke-width="2" />
+    <text x="70" y="630" class="subtitle">说明:</text>
+    <text x="70" y="660" class="description-text">・被动发现: 智能体主动向搜索服务智能体注册其描述文档</text>
+    <text x="70" y="690" class="description-text">・注册API: 智能体通过自定义API端点提交描述文档</text>
+    <text x="70" y="720" class="description-text">・索引服务: 搜索服务智能体爬取并索引注册的智能体描述文档</text>
+    <text x="70" y="750" class="description-text">・调整: 箭头文字位置已优化，避免覆盖。</text>
+
+</svg>
