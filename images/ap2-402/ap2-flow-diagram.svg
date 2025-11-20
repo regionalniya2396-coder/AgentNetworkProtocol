@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; fill: #1a1a1a; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 16px; fill: #666; }
+      .stage-title { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #fff; }
+      .step-text { font-family: Arial, sans-serif; font-size: 13px; fill: #333; }
+      .role-text { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #1a1a1a; }
+      .arrow { fill: none; stroke: #4a90e2; stroke-width: 2; marker-end: url(#arrowhead); }
+      .arrow-label { font-family: Arial, sans-serif; font-size: 12px; fill: #4a90e2; }
+      .stage-bg { fill: #f0f0f0; stroke: #ccc; stroke-width: 2; }
+      .security-text { font-family: Arial, sans-serif; font-size: 11px; fill: #d9534f; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#4a90e2" />
+    </marker>
+  </defs>
+
+  <!-- 标题 -->
+  <text x="600" y="40" class="title" text-anchor="middle">基于ANP的AP2智能体支付协议运行流程</text>
+  <text x="600" y="65" class="subtitle" text-anchor="middle">Agent Payment Protocol v2 on Agent Network Protocol</text>
+
+  <!-- 角色图标 -->
+  <g id="user">
+    <circle cx="100" cy="150" r="30" fill="#ffa726" stroke="#f57c00" stroke-width="2"/>
+    <text x="100" y="200" class="role-text" text-anchor="middle">用户</text>
+  </g>
+
+  <g id="shopper-agent">
+    <rect x="250" y="120" width="120" height="60" rx="10" fill="#66bb6a" stroke="#43a047" stroke-width="2"/>
+    <text x="310" y="155" class="role-text" text-anchor="middle">购物者智能体</text>
+    <text x="310" y="170" class="step-text" text-anchor="middle">(SA)</text>
+  </g>
+
+  <g id="merchant-agent">
+    <rect x="500" y="120" width="120" height="60" rx="10" fill="#42a5f5" stroke="#1e88e5" stroke-width="2"/>
+    <text x="560" y="155" class="role-text" text-anchor="middle">商户智能体</text>
+    <text x="560" y="170" class="step-text" text-anchor="middle">(MA)</text>
+  </g>
+
+  <g id="payment-processor">
+    <rect x="750" y="120" width="120" height="60" rx="10" fill="#ab47bc" stroke="#8e24aa" stroke-width="2"/>
+    <text x="810" y="155" class="role-text" text-anchor="middle">支付处理方</text>
+    <text x="810" y="170" class="step-text" text-anchor="middle">(PP)</text>
+  </g>
+
+  <!-- 阶段1: 购物车创建 -->
+  <rect x="50" y="230" width="850" height="120" class="stage-bg"/>
+  <rect x="50" y="230" width="850" height="30" fill="#5c6bc0" stroke="#3949ab" stroke-width="2"/>
+  <text x="475" y="250" class="stage-title" text-anchor="middle">阶段1: 购物车创建</text>
+
+  <line x1="130" y1="270" x2="250" y2="270" class="arrow"/>
+  <text x="190" y="265" class="arrow-label" text-anchor="middle">1.发起购买</text>
+
+  <line x1="370" y1="280" x2="500" y2="280" class="arrow"/>
+  <text x="435" y="275" class="arrow-label" text-anchor="middle">2.create_cart_mandate</text>
+
+  <rect x="500" y="290" width="120" height="40" fill="#fff9c4" stroke="#fbc02d" stroke-width="1" rx="5"/>
+  <text x="560" y="305" class="step-text" text-anchor="middle">3.生成订单</text>
+  <text x="560" y="320" class="step-text" text-anchor="middle">4.签名cart_hash</text>
+
+  <line x1="500" y1="295" x2="370" y2="295" class="arrow"/>
+  <text x="435" y="290" class="arrow-label" text-anchor="middle">5.CartMandate+二维码</text>
+
+  <!-- 阶段2: 用户授权 -->
+  <rect x="50" y="370" width="850" height="100" class="stage-bg"/>
+  <rect x="50" y="370" width="850" height="30" fill="#26a69a" stroke="#00897b" stroke-width="2"/>
+  <text x="475" y="390" class="stage-title" text-anchor="middle">阶段2: 用户授权</text>
+
+  <line x1="250" y1="410" x2="130" y2="410" class="arrow"/>
+  <text x="190" y="405" class="arrow-label" text-anchor="middle">6.展示订单+二维码</text>
+
+  <rect x="60" y="420" width="90" height="30" fill="#fff9c4" stroke="#fbc02d" stroke-width="1" rx="5"/>
+  <text x="105" y="440" class="step-text" text-anchor="middle">7-8.扫码支付</text>
+
+  <line x1="130" y1="430" x2="250" y2="430" class="arrow"/>
+  <text x="190" y="425" class="arrow-label" text-anchor="middle">9.授权支付</text>
+
+  <!-- 阶段3: 支付处理 -->
+  <rect x="50" y="490" width="850" height="140" class="stage-bg"/>
+  <rect x="50" y="490" width="850" height="30" fill="#ef5350" stroke="#e53935" stroke-width="2"/>
+  <text x="475" y="510" class="stage-title" text-anchor="middle">阶段3: 支付处理</text>
+
+  <rect x="250" y="530" width="120" height="40" fill="#fff9c4" stroke="#fbc02d" stroke-width="1" rx="5"/>
+  <text x="310" y="545" class="step-text" text-anchor="middle">10.计算transaction_data</text>
+  <text x="310" y="560" class="step-text" text-anchor="middle">11.用户签名</text>
+
+  <line x1="370" y1="550" x2="500" y2="550" class="arrow"/>
+  <text x="435" y="545" class="arrow-label" text-anchor="middle">12.PaymentMandate</text>
+
+  <rect x="500" y="575" width="120" height="35" fill="#fff9c4" stroke="#fbc02d" stroke-width="1" rx="5"/>
+  <text x="560" y="590" class="step-text" text-anchor="middle">13.验证签名</text>
+  <text x="560" y="603" class="step-text" text-anchor="middle">验证哈希</text>
+
+  <line x1="620" y1="590" x2="750" y2="590" class="arrow"/>
+  <text x="685" y="585" class="arrow-label" text-anchor="middle">14.确认支付</text>
+
+  <line x1="750" y1="600" x2="620" y2="600" class="arrow"/>
+  <text x="685" y="615" class="arrow-label" text-anchor="middle">16.支付结果</text>
+
+  <!-- 阶段4: 交付确认 -->
+  <rect x="50" y="650" width="850" height="100" class="stage-bg"/>
+  <rect x="50" y="650" width="850" height="30" fill="#7e57c2" stroke="#5e35b1" stroke-width="2"/>
+  <text x="475" y="670" class="stage-title" text-anchor="middle">阶段4: 交付确认</text>
+
+  <line x1="500" y1="690" x2="370" y2="690" class="arrow"/>
+  <text x="435" y="685" class="arrow-label" text-anchor="middle">18.返回交易成功</text>
+
+  <line x1="250" y1="700" x2="130" y2="700" class="arrow"/>
+  <text x="190" y="695" class="arrow-label" text-anchor="middle">19.通知支付成功</text>
+
+  <line x1="500" y1="710" x2="370" y2="710" class="arrow"/>
+  <text x="435" y="725" class="arrow-label" text-anchor="middle">21.DeliveryReceipt(可选)</text>
+
+  <!-- 安全机制说明 -->
+  <rect x="920" y="230" width="250" height="300" fill="#f5f5f5" stroke="#666" stroke-width="1" rx="5"/>
+  <text x="1045" y="255" class="role-text" text-anchor="middle">关键安全机制</text>
+
+  <text x="930" y="280" class="security-text">🔐 数据完整性</text>
+  <text x="940" y="295" class="step-text">cart_hash = SHA-256(JCS(contents))</text>
+
+  <text x="930" y="320" class="security-text">🔐 商户认证</text>
+  <text x="940" y="335" class="step-text">merchant_authorization (RS256)</text>
+
+  <text x="930" y="360" class="security-text">🔐 用户授权</text>
+  <text x="940" y="375" class="step-text">user_authorization (ES256K)</text>
+
+  <text x="930" y="400" class="security-text">🔐 防重放攻击</text>
+  <text x="940" y="415" class="step-text">jti 全局唯一标识符</text>
+
+  <text x="930" y="440" class="security-text">🔐 时间限制</text>
+  <text x="940" y="455" class="step-text">iat/exp 有效期15分钟</text>
+
+  <text x="930" y="480" class="security-text">🔐 身份绑定</text>
+  <text x="940" y="495" class="step-text">DID:WBA 去中心化身份</text>
+
+  <text x="930" y="515" class="step-text" font-weight="bold">核心凭证:</text>
+  <text x="940" y="530" class="step-text">• CartMandate (购物车授权)</text>
+  <text x="940" y="545" class="step-text">• PaymentMandate (支付授权)</text>
+  <text x="940" y="560" class="step-text">• DeliveryReceipt (交付收据)</text>
+
+  <!-- 页脚 -->
+  <text x="600" y="780" class="subtitle" text-anchor="middle">ANP/AP2 - 智能体之间的安全支付协议 | 基于JWT/JWS签名 | 支持二维码支付</text>
+</svg>

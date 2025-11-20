@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 32px; font-weight: bold; fill: #1a1a1a; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 16px; fill: #666; }
+      .actor-box { fill: #4A90E2; stroke: #2E5C8A; stroke-width: 2; }
+      .actor-text { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; fill: white; text-anchor: middle; }
+      .lifeline { stroke: #999; stroke-width: 2; stroke-dasharray: 8,8; }
+      .arrow-request { stroke: #4A90E2; stroke-width: 3; fill: none; marker-end: url(#arrowhead-blue); }
+      .arrow-response { stroke: #E74C3C; stroke-width: 3; fill: none; marker-end: url(#arrowhead-red); }
+      .arrow-payment { stroke: #27AE60; stroke-width: 3; fill: none; marker-end: url(#arrowhead-green); }
+      .label { font-family: Arial, sans-serif; font-size: 15px; fill: #333; font-weight: 500; }
+      .label-detail { font-family: Arial, sans-serif; font-size: 13px; fill: #666; font-style: italic; }
+      .step-number { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; fill: white; text-anchor: middle; }
+      .step-circle { fill: #E74C3C; stroke: #C0392B; stroke-width: 2; }
+      .feature-box { fill: #F8F9FA; stroke: #DEE2E6; stroke-width: 2; }
+      .feature-title { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; fill: #1a1a1a; }
+      .feature-text { font-family: Arial, sans-serif; font-size: 14px; fill: #495057; }
+      .legend-line { stroke-width: 3; fill: none; }
+      .blockchain-box { fill: #FFF3CD; stroke: #FFC107; stroke-width: 2; }
+    </style>
+    <marker id="arrowhead-blue" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#4A90E2" />
+    </marker>
+    <marker id="arrowhead-red" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#E74C3C" />
+    </marker>
+    <marker id="arrowhead-green" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#27AE60" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="700" y="50" class="title" text-anchor="middle">x402 协议流程</text>
+  <text x="700" y="75" class="subtitle" text-anchor="middle">HTTP 402 Payment Required - AI Agent 自动化支付协议</text>
+  
+  <!-- Actors -->
+  <rect x="100" y="120" width="180" height="70" rx="10" class="actor-box"/>
+  <text x="190" y="145" class="actor-text">AI Agent</text>
+  <text x="190" y="170" class="actor-text">(客户端)</text>
+  
+  <rect x="510" y="120" width="180" height="70" rx="10" class="actor-box"/>
+  <text x="600" y="145" class="actor-text">API Server</text>
+  <text x="600" y="170" class="actor-text">(服务提供方)</text>
+  
+  <rect x="920" y="120" width="180" height="70" rx="10" class="actor-box"/>
+  <text x="1010" y="145" class="actor-text">Blockchain</text>
+  <text x="1010" y="170" class="actor-text">(Base/USDC)</text>
+  
+  <rect x="1220" y="120" width="180" height="70" rx="10" class="actor-box"/>
+  <text x="1310" y="155" class="actor-text">Facilitator</text>
+  
+  <!-- Lifelines -->
+  <line x1="190" y1="190" x2="190" y2="650" class="lifeline"/>
+  <line x1="600" y1="190" x2="600" y2="650" class="lifeline"/>
+  <line x1="1010" y1="190" x2="1010" y2="650" class="lifeline"/>
+  <line x1="1310" y1="190" x2="1310" y2="650" class="lifeline"/>
+  
+  <!-- Step 1: Request Resource -->
+  <circle cx="30" cy="240" r="20" class="step-circle"/>
+  <text x="30" y="247" class="step-number">1</text>
+  
+  <line x1="190" y1="240" x2="600" y2="240" class="arrow-request"/>
+  <text x="395" y="225" class="label" text-anchor="middle">GET /api/resource</text>
+  <text x="395" y="260" class="label-detail" text-anchor="middle">请求受保护的资源或API</text>
+  
+  <!-- Step 2: Return 402 -->
+  <circle cx="30" cy="310" r="20" class="step-circle"/>
+  <text x="30" y="317" class="step-number">2</text>
+  
+  <line x1="600" y1="310" x2="190" y2="310" class="arrow-response"/>
+  <text x="395" y="295" class="label" text-anchor="middle">HTTP 402 Payment Required</text>
+  <text x="395" y="330" class="label-detail" text-anchor="middle">返回支付信息: 金额、收款地址、链ID</text>
+  
+  <!-- Step 3: Payment -->
+  <circle cx="30" cy="400" r="20" class="step-circle"/>
+  <text x="30" y="407" class="step-number">3</text>
+  
+  <line x1="190" y1="400" x2="1010" y2="400" class="arrow-payment"/>
+  <text x="600" y="385" class="label" text-anchor="middle">发起链上支付</text>
+  <text x="600" y="420" class="label-detail" text-anchor="middle">AI Agent 使用 USDC 完成转账</text>
+  
+  <!-- Step 4: Payment Confirmation -->
+  <circle cx="30" cy="480" r="20" class="step-circle"/>
+  <text x="30" y="487" class="step-number">4</text>
+  
+  <line x1="1010" y1="480" x2="1310" y2="480" class="arrow-request"/>
+  <text x="1160" y="465" class="label" text-anchor="middle">监听交易</text>
+  
+  <line x1="1310" y1="510" x2="600" y2="510" class="arrow-response"/>
+  <text x="955" y="495" class="label" text-anchor="middle">支付验证通知</text>
+  <text x="955" y="530" class="label-detail" text-anchor="middle">Facilitator 验证链上交易并通知服务器</text>
+  
+  <!-- Step 5: Provide Resource -->
+  <circle cx="30" cy="580" r="20" class="step-circle"/>
+  <text x="30" y="587" class="step-number">5</text>
+  
+  <line x1="600" y1="580" x2="190" y2="580" class="arrow-response"/>
+  <text x="395" y="565" class="label" text-anchor="middle">HTTP 200 OK + Resource</text>
+  <text x="395" y="600" class="label-detail" text-anchor="middle">提供所请求的资源或服务</text>
+  
+  <!-- Key Features Box -->
+  <rect x="50" y="680" width="600" height="100" rx="8" class="feature-box"/>
+  <text x="70" y="705" class="feature-title">核心特性</text>
+  <text x="70" y="730" class="feature-text">• 无需注册或登录 - AI Agent 自动化支付</text>
+  <text x="70" y="755" class="feature-text">• 秒级结算 - 基于 Base L2 区块链,低成本高效率</text>
+  <text x="350" y="730" class="feature-text">• 标准化协议 - 激活 HTTP 402 状态码</text>
+  <text x="350" y="755" class="feature-text">• 稳定币支付 - 使用 USDC 避免价格波动</text>
+  
+  <!-- Technology Stack Box -->
+  <rect x="680" y="680" width="670" height="100" rx="8" class="blockchain-box"/>
+  <text x="700" y="705" class="feature-title">技术栈</text>
+  <text x="700" y="730" class="feature-text">• 区块链: Base (Coinbase L2), Ethereum</text>
+  <text x="700" y="755" class="feature-text">• 稳定币: USDC (Circle)</text>
+  <text x="1000" y="730" class="feature-text">• 协议: HTTP 402, JSON-RPC</text>
+  <text x="1000" y="755" class="feature-text">• 发起方: Coinbase + Cloudflare (2025)</text>
+  
+  <!-- Legend -->
+  <text x="1180" y="630" class="feature-title">图例:</text>
+  <line x1="1180" y1="642" x2="1250" y2="642" class="legend-line arrow-request"/>
+  <text x="1260" y="647" class="feature-text">请求</text>
+  <line x1="1180" y1="662" x2="1250" y2="662" class="legend-line arrow-response"/>
+  <text x="1260" y="667" class="feature-text">响应</text>
+</svg>

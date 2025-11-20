@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 32px; font-weight: bold; fill: #1a1a1a; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 16px; fill: #666; }
+      .actor-box { fill: #4A90E2; stroke: #2E5C8A; stroke-width: 2; }
+      .actor-text { font-family: Arial, sans-serif; font-size: 15px; font-weight: bold; fill: white; text-anchor: middle; }
+      .lifeline { stroke: #999; stroke-width: 2; stroke-dasharray: 8,8; }
+      .arrow-request { stroke: #4A90E2; stroke-width: 3; fill: none; marker-end: url(#arrowhead-blue); }
+      .arrow-response { stroke: #E74C3C; stroke-width: 3; fill: none; marker-end: url(#arrowhead-red); }
+      .arrow-payment { stroke: #27AE60; stroke-width: 3; fill: none; marker-end: url(#arrowhead-green); }
+      .label { font-family: Arial, sans-serif; font-size: 14px; fill: #333; font-weight: 500; }
+      .label-detail { font-family: Arial, sans-serif; font-size: 12px; fill: #666; font-style: italic; }
+      .step-number { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; fill: white; text-anchor: middle; }
+      .step-circle { fill: #E74C3C; stroke: #C0392B; stroke-width: 2; }
+      .phase-box { stroke-width: 2; opacity: 0.8; }
+      .phase-title { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333; }
+      .feature-box { fill: #F8F9FA; stroke: #DEE2E6; stroke-width: 2; }
+      .feature-title { font-family: Arial, sans-serif; font-size: 15px; font-weight: bold; fill: #1a1a1a; }
+      .feature-text { font-family: Arial, sans-serif; font-size: 13px; fill: #495057; }
+      .mandate-box { fill: #E8F5E9; stroke: #4CAF50; stroke-width: 2; }
+      .mandate-text { font-family: Arial, sans-serif; font-size: 11px; fill: #2E7D32; }
+      .payment-method { fill: #FFF3E0; stroke: #FF9800; stroke-width: 2; }
+    </style>
+    <marker id="arrowhead-blue" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#4A90E2" />
+    </marker>
+    <marker id="arrowhead-red" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#E74C3C" />
+    </marker>
+    <marker id="arrowhead-green" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#27AE60" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="800" y="45" class="title" text-anchor="middle">ANP + x402 混合支付协议</text>
+  <text x="800" y="72" class="subtitle" text-anchor="middle">融合 HTTP 402 + CartMandate/PaymentMandate + 支付宝/微信支付</text>
+  
+  <!-- Actors -->
+  <rect x="80" y="110" width="160" height="65" rx="8" class="actor-box"/>
+  <text x="160" y="135" class="actor-text">AI Agent</text>
+  <text x="160" y="158" class="actor-text">(客户端)</text>
+  
+  <rect x="420" y="110" width="160" height="65" rx="8" class="actor-box"/>
+  <text x="500" y="135" class="actor-text">API Server</text>
+  <text x="500" y="158" class="actor-text">(商户智能体)</text>
+  
+  <rect x="760" y="110" width="160" height="65" rx="8" class="actor-box"/>
+  <text x="840" y="135" class="actor-text">User</text>
+  <text x="840" y="158" class="actor-text">(用户)</text>
+  
+  <rect x="1100" y="110" width="160" height="65" rx="8" class="actor-box"/>
+  <text x="1180" y="135" class="actor-text">Payment</text>
+  <text x="1180" y="158" class="actor-text">(支付宝/微信)</text>
+  
+  <rect x="1400" y="110" width="160" height="65" rx="8" class="actor-box"/>
+  <text x="1480" y="135" class="actor-text">Facilitator</text>
+  <text x="1480" y="158" class="actor-text">(验证方)</text>
+  
+  <!-- Lifelines -->
+  <line x1="160" y1="175" x2="160" y2="880" class="lifeline"/>
+  <line x1="500" y1="175" x2="500" y2="880" class="lifeline"/>
+  <line x1="840" y1="175" x2="840" y2="880" class="lifeline"/>
+  <line x1="1180" y1="175" x2="1180" y2="880" class="lifeline"/>
+  <line x1="1480" y1="175" x2="1480" y2="880" class="lifeline"/>
+  
+  <!-- Phase 1: Resource Request & 402 Response -->
+  <rect x="20" y="210" width="140" height="45" rx="5" class="phase-box" style="fill: #E3F2FD; stroke: #2196F3;"/>
+  <text x="90" y="227" class="phase-title" text-anchor="middle">阶段1:</text>
+  <text x="90" y="245" class="phase-title" text-anchor="middle">资源请求</text>
+  
+  <!-- Step 1: Request Resource -->
+  <circle cx="45" cy="250" r="18" class="step-circle"/>
+  <text x="45" y="256" class="step-number">1</text>
+  
+  <line x1="160" y1="250" x2="500" y2="250" class="arrow-request"/>
+  <text x="330" y="237" class="label" text-anchor="middle">GET /api/resource</text>
+  <text x="330" y="267" class="label-detail" text-anchor="middle">请求受保护的API资源</text>
+  
+  <!-- Step 2: Return 402 + CartMandate -->
+  <circle cx="45" cy="335" r="18" class="step-circle"/>
+  <text x="45" y="341" class="step-number">2</text>
+  
+  <line x1="500" y1="335" x2="160" y2="335" class="arrow-response"/>
+  <text x="330" y="322" class="label" text-anchor="middle">HTTP 402 + CartMandate</text>
+  <text x="330" y="365" class="label-detail" text-anchor="middle">返回购物车授权凭证</text>
+  
+  <!-- CartMandate Details Box -->
+  <rect x="170" y="375" width="320" height="85" rx="5" class="mandate-box"/>
+  <text x="180" y="393" class="feature-title">CartMandate 内容:</text>
+  <text x="190" y="413" class="mandate-text">• order_id, items, total_amount</text>
+  <text x="190" y="430" class="mandate-text">• payment_methods: [支付宝, 微信]</text>
+  <text x="190" y="447" class="mandate-text">• merchant_authorization (JWS签名)</text>
+  
+  <!-- Phase 2: User Authorization -->
+  <rect x="20" y="475" width="140" height="45" rx="5" class="phase-box" style="fill: #F3E5F5; stroke: #9C27B0;"/>
+  <text x="90" y="492" class="phase-title" text-anchor="middle">阶段2:</text>
+  <text x="90" y="510" class="phase-title" text-anchor="middle">用户授权</text>
+  
+  <!-- Step 3: Show to User -->
+  <circle cx="45" cy="510" r="18" class="step-circle"/>
+  <text x="45" y="516" class="step-number">3</text>
+  
+  <line x1="160" y1="510" x2="840" y2="510" class="arrow-request"/>
+  <text x="500" y="497" class="label" text-anchor="middle">展示订单信息</text>
+  <text x="500" y="527" class="label-detail" text-anchor="middle">显示商品、价格、支付方式选择</text>
+  
+  <!-- Step 4: User Selects Payment -->
+  <circle cx="45" cy="580" r="18" class="step-circle"/>
+  <text x="45" y="586" class="step-number">4</text>
+  
+  <rect x="760" y="550" width="160" height="55" rx="5" class="payment-method"/>
+  <text x="840" y="570" class="label" text-anchor="middle">用户选择支付方式</text>
+  <text x="840" y="590" class="label-detail" text-anchor="middle">支付宝 / 微信支付</text>
+  
+  <!-- Step 5: Payment via Alipay/WeChat -->
+  <circle cx="45" cy="650" r="18" class="step-circle"/>
+  <text x="45" y="656" class="step-number">5</text>
+  
+  <line x1="840" y1="650" x2="1180" y2="650" class="arrow-payment"/>
+  <text x="1010" y="637" class="label" text-anchor="middle">扫码支付</text>
+  <text x="1010" y="667" class="label-detail" text-anchor="middle">支付宝/微信完成支付</text>
+  
+  <!-- Phase 3: Payment Mandate -->
+  <rect x="20" y="695" width="140" height="45" rx="5" class="phase-box" style="fill: #FFF3E0; stroke: #FF9800;"/>
+  <text x="90" y="712" class="phase-title" text-anchor="middle">阶段3:</text>
+  <text x="90" y="730" class="phase-title" text-anchor="middle">支付确认</text>
+  
+  <!-- Step 6: User Authorizes -->
+  <circle cx="45" cy="730" r="18" class="step-circle"/>
+  <text x="45" y="736" class="step-number">6</text>
+  
+  <line x1="840" y1="730" x2="160" y2="730" class="arrow-response"/>
+  <text x="500" y="717" class="label" text-anchor="middle">授权支付</text>
+  <text x="500" y="747" class="label-detail" text-anchor="middle">用户确认并提供支付凭证</text>
+  
+  <!-- Step 7: Send PaymentMandate -->
+  <circle cx="45" cy="800" r="18" class="step-circle"/>
+  <text x="45" y="806" class="step-number">7</text>
+  
+  <line x1="160" y1="800" x2="500" y2="800" class="arrow-request"/>
+  <text x="330" y="787" class="label" text-anchor="middle">POST /api/payment + PaymentMandate</text>
+  <text x="330" y="830" class="label-detail" text-anchor="middle">携带用户授权签名 (user_authorization)</text>
+  
+  <!-- PaymentMandate Details Box -->
+  <rect x="510" y="750" width="300" height="85" rx="5" class="mandate-box"/>
+  <text x="520" y="768" class="feature-title">PaymentMandate 内容:</text>
+  <text x="530" y="788" class="mandate-text">• payment_mandate_id, order_id</text>
+  <text x="530" y="805" class="mandate-text">• payment_method: 支付宝/微信</text>
+  <text x="530" y="822" class="mandate-text">• user_authorization (JWS签名)</text>
+  
+  <!-- Step 8: Verify Payment -->
+  <circle cx="45" cy="870" r="18" class="step-circle"/>
+  <text x="45" y="876" class="step-number">8</text>
+  
+  <line x1="500" y1="870" x2="1180" y2="870" class="arrow-request"/>
+  <text x="840" y="857" class="label" text-anchor="middle">验证支付</text>
+  
+  <line x1="1180" y1="870" x2="1480" y2="870" class="arrow-request"/>
+  <text x="1330" y="857" class="label" text-anchor="middle">查询交易</text>
+  
+  <!-- Features Section -->
+  <text x="50" y="935" class="feature-title">核心创新:</text>
+  <rect x="50" y="945" width="700" height="40" rx="5" class="feature-box"/>
+  <text x="65" y="965" class="feature-text">• HTTP 402 标准化 - 统一支付请求接口</text>
+  <text x="65" y="980" class="feature-text">• CartMandate - 商户签名保证订单完整性 (防篡改)</text>
+  <text x="400" y="965" class="feature-text">• PaymentMandate - 用户授权签名 (不可抵赖)</text>
+  <text x="400" y="980" class="feature-text">• 支持主流支付 - 支付宝、微信、USDC</text>
+  
+  <!-- Technical Details -->
+  <text x="800" y="935" class="feature-title">技术实现:</text>
+  <rect x="800" y="945" width="750" height="40" rx="5" style="fill: #E8F5E9; stroke: #4CAF50; stroke-width: 2;"/>
+  <text x="815" y="965" class="feature-text">• ANP: DID:WBA 身份认证 + JWT/JWS 签名</text>
+  <text x="815" y="980" class="feature-text">• x402: HTTP 402 状态码 + 标准化支付流程</text>
+  <text x="1100" y="965" class="feature-text">• cart_hash = SHA-256(JCS(contents))</text>
+  <text x="1100" y="980" class="feature-text">• transaction_data = [cart_hash, pmt_hash]</text>
+  
+  <!-- Legend -->
+  <text x="1200" y="220" class="feature-title">图例:</text>
+  <line x1="1200" y1="235" x2="1280" y2="235" style="stroke: #4A90E2; stroke-width: 3; marker-end: url(#arrowhead-blue);"/>
+  <text x="1290" y="240" class="feature-text">请求</text>
+  <line x1="1200" y1="255" x2="1280" y2="255" style="stroke: #E74C3C; stroke-width: 3; marker-end: url(#arrowhead-red);"/>
+  <text x="1290" y="260" class="feature-text">响应</text>
+  <line x1="1200" y1="275" x2="1280" y2="275" style="stroke: #27AE60; stroke-width: 3; marker-end: url(#arrowhead-green);"/>
+  <text x="1290" y="280" class="feature-text">支付</text>
+</svg>
