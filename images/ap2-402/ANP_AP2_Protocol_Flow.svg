@@ -1,132 +1,158 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1100" viewBox="0 0 1200 1100">
   <defs>
     <style>
-      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; fill: #333; }
-      .actor-box { fill: #A9D6E5; stroke: #2E86AB; stroke-width: 2; }
-      .actor-text { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333; text-anchor: middle; }
-      .lifeline { stroke: #999; stroke-width: 1; stroke-dasharray: 5,5; }
-      .arrow-request { stroke: #2E86AB; stroke-width: 2; fill: none; marker-end: url(#arrowhead-blue); }
-      .arrow-response { stroke: #E63946; stroke-width: 2; fill: none; stroke-dasharray: 5,5; marker-end: url(#arrowhead-red); }
-      .label { font-family: Arial, sans-serif; font-size: 12px; fill: #333; text-anchor: middle; }
-      .label-small { font-family: Arial, sans-serif; font-size: 10px; fill: #666; text-anchor: middle; font-style: italic; }
-      .phase-box { fill: #FFE5B4; stroke: #FF9800; stroke-width: 1; opacity: 0.7; }
-      .phase-text { font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; fill: #333; }
-      .action-box { fill: #90EE90; stroke: #4CAF50; stroke-width: 1; opacity: 0.5; }
-      .legend-text { font-family: Arial, sans-serif; font-size: 11px; fill: #333; }
-      .legend-title { font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; fill: #333; }
+      .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 28px; font-weight: bold; fill: #333; }
+      .actor-box { fill: #E1F5FE; stroke: #0288D1; stroke-width: 2; rx: 10; ry: 10; }
+      .actor-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 16px; font-weight: bold; fill: #01579B; text-anchor: middle; }
+      .lifeline { stroke: #B0BEC5; stroke-width: 1.5; stroke-dasharray: 8,8; }
+      .arrow-request { stroke: #0288D1; stroke-width: 2; fill: none; marker-end: url(#arrowhead-blue); }
+      .arrow-response { stroke: #43A047; stroke-width: 2; fill: none; stroke-dasharray: 5,5; marker-end: url(#arrowhead-green); }
+      .arrow-callback { stroke: #E91E63; stroke-width: 2; fill: none; stroke-dasharray: 5,5; marker-end: url(#arrowhead-pink); }
+      .label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; fill: #333; text-anchor: middle; background-color: white; }
+      .label-bg { fill: white; opacity: 0.8; }
+      .label-note { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; fill: #666; text-anchor: middle; font-style: italic; }
+      
+      .phase-box { fill: #FFF3E0; stroke: #FF9800; stroke-width: 1; opacity: 0.6; rx: 5; ry: 5; }
+      .phase-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: bold; fill: #E65100; }
+      
+      .action-box { fill: #E8F5E9; stroke: #4CAF50; stroke-width: 1.5; rx: 5; ry: 5; }
+      .legend-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; fill: #455A64; }
+      .legend-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #263238; }
     </style>
-    <marker id="arrowhead-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#2E86AB" />
+    <marker id="arrowhead-blue" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <path d="M2,2 L11,6 L2,10 L2,2" fill="#0288D1" />
     </marker>
-    <marker id="arrowhead-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#E63946" />
+    <marker id="arrowhead-green" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <path d="M2,2 L11,6 L2,10 L2,2" fill="#43A047" />
+    </marker>
+    <marker id="arrowhead-pink" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto">
+      <path d="M2,2 L11,6 L2,10 L2,2" fill="#E91E63" />
     </marker>
   </defs>
   
   <!-- Title -->
-  <text x="600" y="40" class="title" text-anchor="middle">ANP/AP2 智能体支付协议流程</text>
+  <text x="600" y="50" class="title" text-anchor="middle">ANP/AP2 智能体支付协议流程</text>
   
   <!-- Actors -->
-  <rect x="50" y="70" width="120" height="60" rx="10" class="actor-box"/>
-  <text x="110" y="105" class="actor-text">用户</text>
-  
-  <rect x="270" y="70" width="120" height="60" rx="10" class="actor-box"/>
-  <text x="330" y="95" class="actor-text">购物者智能体</text>
-  <text x="330" y="115" class="actor-text">(SA)</text>
-  
-  <rect x="540" y="70" width="120" height="60" rx="10" class="actor-box"/>
-  <text x="600" y="95" class="actor-text">商户智能体</text>
-  <text x="600" y="115" class="actor-text">(MA)</text>
-  
-  <rect x="810" y="70" width="120" height="60" rx="10" class="actor-box"/>
-  <text x="870" y="95" class="actor-text">支付处理方</text>
-  <text x="870" y="115" class="actor-text">(PP)</text>
+  <g transform="translate(0, 80)">
+    <rect x="100" y="0" width="140" height="60" class="actor-box"/>
+    <text x="170" y="25" class="actor-text">User</text>
+    <text x="170" y="45" class="actor-text">用户</text>
+    
+    <rect x="350" y="0" width="140" height="60" class="actor-box"/>
+    <text x="420" y="25" class="actor-text">Shopper Agent</text>
+    <text x="420" y="45" class="actor-text">购物者智能体 (SA)</text>
+    
+    <rect x="600" y="0" width="140" height="60" class="actor-box"/>
+    <text x="670" y="25" class="actor-text">Merchant Agent</text>
+    <text x="670" y="45" class="actor-text">商户智能体 (MA)</text>
+    
+    <rect x="850" y="0" width="140" height="60" class="actor-box"/>
+    <text x="920" y="25" class="actor-text">Payment Processor</text>
+    <text x="920" y="45" class="actor-text">支付处理方 (PP)</text>
+  </g>
   
   <!-- Lifelines -->
-  <line x1="110" y1="130" x2="110" y2="820" class="lifeline"/>
-  <line x1="330" y1="130" x2="330" y2="820" class="lifeline"/>
-  <line x1="600" y1="130" x2="600" y2="820" class="lifeline"/>
-  <line x1="870" y1="130" x2="870" y2="820" class="lifeline"/>
+  <line x1="170" y1="140" x2="170" y2="980" class="lifeline"/>
+  <line x1="420" y1="140" x2="420" y2="980" class="lifeline"/>
+  <line x1="670" y1="140" x2="670" y2="980" class="lifeline"/>
+  <line x1="920" y1="140" x2="920" y2="980" class="lifeline"/>
   
-  <!-- Phase 1: Cart Creation -->
-  <rect x="10" y="160" width="100" height="50" rx="5" class="phase-box"/>
-  <text x="60" y="180" class="phase-text" text-anchor="middle">阶段1:</text>
-  <text x="60" y="195" class="phase-text" text-anchor="middle">购物车创建</text>
+  <!-- Phase 1: Creation -->
+  <rect x="20" y="160" width="120" height="30" class="phase-box"/>
+  <text x="80" y="180" class="phase-text" text-anchor="middle">Phase 1: 创建订单</text>
   
-  <!-- Step 1: User request -->
-  <line x1="110" y1="180" x2="330" y2="180" class="arrow-request"/>
-  <text x="220" y="170" class="label">1. 发起购买请求</text>
+  <!-- 1. Request -->
+  <line x1="170" y1="190" x2="420" y2="190" class="arrow-request"/>
+  <text x="295" y="185" class="label">1. 发起购买请求</text>
   
-  <!-- Step 2: create_cart_mandate -->
-  <line x1="330" y1="220" x2="600" y2="220" class="arrow-request"/>
-  <text x="465" y="210" class="label">2. create_cart_mandate</text>
+  <!-- 2. create_cart_mandate -->
+  <line x1="420" y1="230" x2="670" y2="230" class="arrow-request"/>
+  <text x="545" y="225" class="label">2. create_cart_mandate</text>
   
-  <!-- Step 3: Return CartMandate -->
-  <line x1="600" y1="260" x2="330" y2="260" class="arrow-response"/>
-  <text x="465" y="250" class="label">3. CartMandate + 二维码</text>
-  <text x="465" y="275" class="label-small">(merchant_authorization签名)</text>
+  <!-- 3. CartMandate -->
+  <line x1="670" y1="270" x2="420" y2="270" class="arrow-response"/>
+  <text x="545" y="265" class="label">3. CartMandate + 二维码</text>
+  <text x="545" y="285" class="label-note">(包含商户签名)</text>
   
-  <!-- Phase 2: User Authorization -->
-  <rect x="10" y="300" width="100" height="50" rx="5" style="fill: #D4F1F4; stroke: #00BCD4; stroke-width: 1; opacity: 0.7;"/>
-  <text x="60" y="320" class="phase-text" text-anchor="middle">阶段2:</text>
-  <text x="60" y="335" class="phase-text" text-anchor="middle">用户授权</text>
+  <!-- Phase 2: Authorization & Payment -->
+  <rect x="20" y="310" width="120" height="30" class="phase-box"/>
+  <text x="80" y="330" class="phase-text" text-anchor="middle">Phase 2: 授权支付</text>
   
-  <!-- Step 4: Show QR code -->
-  <line x1="330" y1="320" x2="110" y2="320" class="arrow-response"/>
-  <text x="220" y="310" class="label">4. 展示订单+二维码</text>
+  <!-- 4. Show QR -->
+  <line x1="420" y1="340" x2="170" y2="340" class="arrow-response"/>
+  <text x="295" y="335" class="label">4. 展示订单+二维码</text>
   
-  <!-- Step 5: User scan and pay -->
-  <rect x="50" y="350" width="120" height="40" rx="5" class="action-box"/>
-  <text x="110" y="365" class="label" text-anchor="middle">5. 扫码支付</text>
-  <text x="110" y="380" class="label" text-anchor="middle">(支付宝/微信)</text>
+  <!-- 5. send_payment_mandate -->
+  <line x1="420" y1="390" x2="670" y2="390" class="arrow-request"/>
+  <text x="545" y="385" class="label">5. send_payment_mandate</text>
+  <text x="545" y="405" class="label-note">(用户授权签名, MA返回200 OK)</text>
   
-  <!-- Phase 3: Payment Processing -->
-  <rect x="10" y="420" width="100" height="50" rx="5" style="fill: #FFD6E8; stroke: #E91E63; stroke-width: 1; opacity: 0.7;"/>
-  <text x="60" y="440" class="phase-text" text-anchor="middle">阶段3:</text>
-  <text x="60" y="455" class="phase-text" text-anchor="middle">支付处理</text>
+  <!-- 6. Scan & Pay + Callback -->
+  <!-- User Action Box -->
+  <rect x="110" y="430" width="120" height="40" class="action-box"/>
+  <text x="170" y="455" class="label" style="font-weight:bold;">6a. 用户扫码支付</text>
   
-  <!-- Step 6: send_payment_mandate -->
-  <line x1="330" y1="440" x2="600" y2="440" class="arrow-request"/>
-  <text x="465" y="430" class="label">6. send_payment_mandate</text>
-  <text x="465" y="455" class="label-small">(user_authorization签名)</text>
+  <!-- Arrow from User to PP (conceptual scan) -->
+  <line x1="230" y1="450" x2="920" y2="450" class="arrow-request" style="stroke-dasharray: 2,2;"/>
   
-  <!-- Step 7: Verify payment -->
-  <line x1="600" y1="490" x2="870" y2="490" class="arrow-request"/>
-  <text x="735" y="480" class="label">7. 验证支付</text>
+  <!-- Callback PP -> MA -->
+  <line x1="920" y1="490" x2="670" y2="490" class="arrow-callback"/>
+  <text x="795" y="485" class="label">6b. 支付结果通知 (Callback)</text>
+  <text x="795" y="505" class="label-note">(支付宝/微信 -> 商户)</text>
+
+  <!-- Phase 3: Completion -->
+  <rect x="20" y="530" width="120" height="30" class="phase-box"/>
+  <text x="80" y="550" class="phase-text" text-anchor="middle">Phase 3: 凭证交付</text>
   
-  <!-- Step 8: Payment result -->
-  <line x1="870" y1="530" x2="600" y2="530" class="arrow-response"/>
-  <text x="735" y="520" class="label">8. 支付结果</text>
+  <!-- 7. Payment Credential -->
+  <line x1="670" y1="570" x2="420" y2="570" class="arrow-response"/>
+  <text x="545" y="565" class="label">7. 发送支付确认凭证</text>
+  <text x="545" y="585" class="label-note">(Payment Confirmation)</text>
+
+  <!-- 8. Notify Payment Result -->
+  <line x1="420" y1="610" x2="170" y2="610" class="arrow-response"/>
+  <text x="295" y="605" class="label">8. 通知支付结果</text>
   
-  <!-- Step 9: Return success -->
-  <line x1="600" y1="570" x2="330" y2="570" class="arrow-response"/>
-  <text x="465" y="560" class="label">9. 交易成功</text>
+  <!-- 9. Logistics Credential -->
+  <line x1="670" y1="660" x2="420" y2="660" class="arrow-response"/>
+  <text x="545" y="655" class="label">9. 发送物流状态凭证</text>
+  <text x="545" y="675" class="label-note">(Logistics Status)</text>
+
+  <!-- 10. Notify Logistics -->
+  <line x1="420" y1="700" x2="170" y2="700" class="arrow-response"/>
+  <text x="295" y="695" class="label">10. 通知物流状态</text>
   
-  <!-- Step 10: Notify user -->
-  <line x1="330" y1="610" x2="110" y2="610" class="arrow-response"/>
-  <text x="220" y="600" class="label">10. 通知用户</text>
-  
-  <!-- Legend: Key Features -->
-  <text x="50" y="680" class="legend-title">核心特性:</text>
-  <text x="50" y="700" class="legend-text">• DID:WBA 去中心化身份</text>
-  <text x="50" y="720" class="legend-text">• JWT/JWS 密码学签名</text>
-  <text x="50" y="740" class="legend-text">• 二维码支付(支付宝/微信)</text>
-  <text x="50" y="760" class="legend-text">• cart_hash 防篡改</text>
-  <text x="50" y="780" class="legend-text">• 用户明确授权</text>
-  
-  <!-- Legend: Arrow Types -->
-  <text x="700" y="680" class="legend-title">图例:</text>
-  <line x1="700" y1="695" x2="780" y2="695" class="arrow-request"/>
-  <text x="790" y="700" class="legend-text">请求</text>
-  <line x1="700" y1="715" x2="780" y2="715" class="arrow-response"/>
-  <text x="790" y="720" class="legend-text">响应</text>
-  
-  <!-- Security Features Box -->
-  <rect x="700" y="740" width="450" height="120" rx="5" style="fill: #FFF9E6; stroke: #FFA726; stroke-width: 1;"/>
-  <text x="720" y="760" class="legend-title">安全机制:</text>
-  <text x="720" y="780" class="legend-text">• cart_hash = SHA-256(JCS(contents)) - 确保购物车内容不被篡改</text>
-  <text x="720" y="800" class="legend-text">• merchant_authorization (RS256/ES256K) - 商户认证</text>
-  <text x="720" y="820" class="legend-text">• user_authorization - 用户明确授权证明</text>
-  <text x="720" y="840" class="legend-text">• jti 全局唯一标识符 - 防重放攻击</text>
+  <!-- Legend Area -->
+  <g transform="translate(50, 850)">
+    <rect x="0" y="0" width="1100" height="120" rx="8" fill="#FAFAFA" stroke="#E0E0E0"/>
+    
+    <!-- Column 1: Core Features -->
+    <text x="20" y="30" class="legend-title">核心特性:</text>
+    <text x="20" y="55" class="legend-text">• DID:WBA 去中心化身份</text>
+    <text x="20" y="75" class="legend-text">• JWT/JWS 密码学签名</text>
+    <text x="20" y="95" class="legend-text">• 用户明确授权 (User Authorization)</text>
+    
+    <!-- Column 2: Security -->
+    <text x="300" y="30" class="legend-title">安全机制:</text>
+    <text x="300" y="55" class="legend-text">• Cart Hash: 防止购物车内容篡改</text>
+    <text x="300" y="75" class="legend-text">• Mandates: 基于凭证的交易流程</text>
+    <text x="300" y="95" class="legend-text">• Nonce/JTI: 防重放攻击</text>
+    
+    <!-- Column 3: Legend -->
+    <text x="600" y="30" class="legend-title">图例:</text>
+    
+    <line x1="600" y1="50" x2="650" y2="50" class="arrow-request"/>
+    <text x="660" y="55" class="legend-text">请求 (Request)</text>
+    
+    <line x1="600" y1="75" x2="650" y2="75" class="arrow-response"/>
+    <text x="660" y="80" class="legend-text">响应/凭证 (Response)</text>
+    
+    <line x1="600" y1="100" x2="650" y2="100" class="arrow-callback"/>
+    <text x="660" y="105" class="legend-text">异步回调 (Callback)</text>
+    
+    <rect x="800" y="45" width="20" height="20" class="action-box"/>
+    <text x="830" y="60" class="legend-text">用户动作</text>
+  </g>
 </svg>
