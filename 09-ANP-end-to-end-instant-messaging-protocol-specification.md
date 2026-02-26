@@ -4,7 +4,7 @@ Note: This specification is still a draft version and will undergo further optim
 
 ## Abstract
 
-This specification defines the ANP End-to-End Instant Messaging Protocol, an instant messaging protocol based on HTTP and JSON-RPC 2.0 that supports private chat, group chat, directory management, and end-to-end encrypted (E2EE) communication. The protocol uses `did:wba` as the identity identifier and employs the DID WBA authentication mechanism for identity verification.
+This specification defines the ANP End-to-End Instant Messaging Protocol, an instant messaging protocol based on HTTP and JSON-RPC 2.0 that supports private chat, group chat, and end-to-end encrypted (E2EE) communication. The protocol uses `did:wba` as the identity identifier and employs the DID WBA authentication mechanism for identity verification.
 
 This specification replaces the WebSocket-based schemes described in [04-E2EE Communication Protocol Based on DID](message/04-end-to-end-encrypted-communication-technology-protocol-based-on-did.md) and [05-Message Service Protocol Based on DID](message/05-message-service-protocol-based-on-did.md), while preserving the core E2EE encryption logic and unifying the transport layer protocol to HTTP + JSON-RPC 2.0.
 
@@ -55,7 +55,7 @@ The overall architecture adopts a message server relay model:
 ```
 
 - **Agent**: The sender and receiver of messages, identified by `did:wba`.
-- **Message Server**: Provides message sending/receiving services for Agents, including message storage, inbox management, group management, and directory services.
+- **Message Server**: Provides message sending/receiving services for Agents, including message storage, inbox management, and group management.
 - Agents communicate with their associated Message Servers via HTTP JSON-RPC 2.0 protocol.
 - Communication between Message Servers is outside the scope of this specification.
 
@@ -66,10 +66,9 @@ The overall architecture adopts a message server relay model:
 | **Transport Protocol** | HTTP + JSON-RPC 2.0 |
 | **Content Format** | `application/json` |
 | **Identity Identifier** | `did:wba` (Decentralized Identifier) |
-| **Authentication** | DID WBA Authentication + Bearer JWT |
+| **Authentication** | DID WBA Authentication (see [DID:WBA Method Design Specification](03-did-wba-method-design-specification.md)) |
 | **Message Types** | Private chat, Group chat |
 | **E2EE Support** | ECDHE-based end-to-end encryption (private chat only) |
-| **Directory** | Public directory management |
 
 ### 2.3 Design Principles
 
@@ -102,35 +101,9 @@ Example: `did:wba:example.com:group:group_dev`
 
 When a DID does not exist, the server returns error code `-32002` (resource not found).
 
-### 3.2 Authentication Methods
+### 3.2 Authentication
 
-This protocol supports two authentication methods:
-
-#### 3.2.1 DID WBA Authentication
-
-DID WBA authentication information is passed via HTTP request headers:
-
-```
-Authorization: DID <wba-auth-header>
-```
-
-Upon receiving a DID WBA authentication request, the server forwards it to the user-service for verification. Upon successful verification, a JWT token is returned, and subsequent requests can use Bearer JWT authentication.
-
-#### 3.2.2 Bearer JWT Authentication
-
-After successful DID WBA verification, subsequent requests can use JWT token authentication:
-
-```
-Authorization: Bearer <token>
-```
-
-Authentication information is parsed by middleware, and each RPC method checks based on its own authentication requirements. Authentication requirements are divided into three levels:
-
-| Level | Description |
-|-------|-------------|
-| **none** | No authentication required |
-| **optional** | Optional authentication; authenticated users will undergo identity consistency verification |
-| **did** | Authentication required |
+This protocol adopts the ANP unified DID WBA authentication mechanism for identity verification. For the complete authentication flow and technical details, see [DID:WBA Method Design Specification](03-did-wba-method-design-specification.md).
 
 ## 4. JSON-RPC 2.0 Transport Protocol
 
@@ -199,15 +172,89 @@ This protocol uses JSON-RPC 2.0 standard error codes with extended business erro
 
 All interfaces are invoked via HTTP POST method, with the request body being a JSON-RPC 2.0 formatted JSON object.
 
-## 5. Message Service API Definitions
+## 5. Agent Description Protocol Integration
 
-This protocol defines 13 JSON-RPC methods distributed across three service endpoints.
+This section describes how to declare E2EE instant messaging capabilities in an Agent Description (AD) document, enabling other agents to automatically discover and interact with the E2EE IM service. The ANP E2EE IM protocol is treated as a built-in protocol type within the Agent Description Protocol framework (see [Agent Description Protocol Specification](chinese/07-ANP-智能体描述协议规范.md) for the full AD specification).
 
-### 5.1 Message Interface
+### 5.1 Declaring E2EE IM Support in the AD Document
+
+An agent that supports the ANP E2EE IM protocol should include an entry in the `interfaces` array of its AD document. Since the E2EE IM protocol is a built-in ANP protocol, the interface description uses the `content` field for inline endpoint and capability declaration rather than referencing an external file via `url`.
+
+**Example AD Document:**
+
+```json
+{
+  "protocolType": "ANP",
+  "protocolVersion": "1.0.0",
+  "type": "AgentDescription",
+  "name": "Example Chat Agent",
+  "did": "did:wba:example.com:user:alice",
+  "interfaces": [
+    {
+      "type": "StructuredInterface",
+      "protocol": "ANP-E2EE-IM",
+      "version": "1.0",
+      "description": "ANP E2EE instant messaging protocol supporting private chat, group chat, and end-to-end encrypted communication.",
+      "content": {
+        "endpoints": [
+          {
+            "path": "/api/v1/messages/rpc",
+            "description": "Message service endpoint for sending, receiving, and managing messages including E2EE encrypted messages"
+          },
+          {
+            "path": "/api/v1/groups/rpc",
+            "description": "Group service endpoint for group management and group messages"
+          }
+        ],
+        "e2ee": {
+          "supported_versions": ["1.0"],
+          "cipher_suites": ["TLS_AES_128_GCM_SHA256"],
+          "supported_groups": ["secp256r1"],
+          "description": "E2EE capabilities: ECDHE key exchange, AES-GCM encryption, private chat only"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 5.2 Field Descriptions
+
+**Interface-level Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| type | string | Yes | Fixed as `"StructuredInterface"` |
+| protocol | string | Yes | Fixed as `"ANP-E2EE-IM"` to identify this protocol |
+| version | string | Yes | Protocol version (e.g., `"1.0"`) |
+| description | string | No | Human-readable description of the interface |
+| content | object | Yes | Inline description of endpoints and E2EE capabilities |
+
+**content.endpoints Element:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| path | string | Yes | API endpoint path (e.g., `/api/v1/messages/rpc`) |
+| description | string | No | Description of the endpoint's functionality |
+
+**content.e2ee Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| supported_versions | array | Yes | List of supported E2EE protocol versions |
+| cipher_suites | array | Yes | List of supported cipher suites (e.g., `["TLS_AES_128_GCM_SHA256"]`) |
+| supported_groups | array | Yes | List of supported elliptic curve groups (e.g., `["secp256r1"]`) |
+| description | string | No | Human-readable summary of E2EE capabilities |
+
+## 6. Message Service API Definitions
+
+This protocol defines 10 JSON-RPC methods distributed across two service endpoints.
+
+### 6.1 Message Interface
 
 **Endpoint:** `POST /api/v1/messages/rpc`
 
-#### 5.1.1 send — Send Message
+#### 6.1.1 send — Send Message
 
 Send a message (private or group chat), also serving as the unified transport method for E2EE handshake and encrypted messages.
 
@@ -293,9 +340,9 @@ Send a message (private or group chat), also serving as the unified transport me
 }
 ```
 
-See Section 7 for E2EE message request examples.
+See Section 8 for E2EE message request examples.
 
-#### 5.1.2 get_detail — Get Message Details
+#### 6.1.2 get_detail — Get Message Details
 
 Get detailed information of a specified message.
 
@@ -340,7 +387,7 @@ Get detailed information of a specified message.
 }
 ```
 
-#### 5.1.3 get_inbox — Query Inbox
+#### 6.1.3 get_inbox — Query Inbox
 
 Query the current user's inbox messages.
 
@@ -397,7 +444,7 @@ Query the current user's inbox messages.
 }
 ```
 
-#### 5.1.4 mark_read — Mark as Read
+#### 6.1.4 mark_read — Mark as Read
 
 Mark specified messages as read.
 
@@ -436,7 +483,7 @@ Mark specified messages as read.
 }
 ```
 
-#### 5.1.5 get_history — Get Conversation History
+#### 6.1.5 get_history — Get Conversation History
 
 Get message history for private or group conversations.
 
@@ -506,7 +553,7 @@ Get message history for private or group conversations.
 }
 ```
 
-#### 5.1.6 get_batch_history — Batch Get Group Chat History
+#### 6.1.6 get_batch_history — Batch Get Group Chat History
 
 Batch get message history for multiple group chats.
 
@@ -561,7 +608,7 @@ Batch get message history for multiple group chats.
 }
 ```
 
-#### 5.1.7 delete_inbox — Delete Inbox Messages
+#### 6.1.7 delete_inbox — Delete Inbox Messages
 
 Delete specified messages from the inbox.
 
@@ -600,11 +647,11 @@ Delete specified messages from the inbox.
 }
 ```
 
-### 5.2 Group Interface
+### 6.2 Group Interface
 
 **Endpoint:** `POST /api/v1/groups/rpc`
 
-#### 5.2.1 list — Get Public Group List
+#### 6.2.1 list — Get Public Group List
 
 Get all public groups on the platform.
 
@@ -650,7 +697,7 @@ Get all public groups on the platform.
 }
 ```
 
-#### 5.2.2 get_detail — Get Group Details
+#### 6.2.2 get_detail — Get Group Details
 
 Get detailed information of a specified group.
 
@@ -692,7 +739,7 @@ Get detailed information of a specified group.
 }
 ```
 
-#### 5.2.3 get_messages — Get Group Messages
+#### 6.2.3 get_messages — Get Group Messages
 
 Get the message list for a specified group.
 
@@ -745,168 +792,9 @@ Get the message list for a specified group.
 }
 ```
 
-### 5.3 Directory Interface
+## 7. Message Type Definitions
 
-**Endpoint:** `POST /api/v1/directory/rpc`
-
-#### 5.3.1 list — Get Public Directory
-
-Get the list of public users and Agents on the platform.
-
-**Authentication:** none
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| skip | int | No | Number of records to skip, default 0 |
-| limit | int | No | Number of records to return, default 50, max 100 |
-| search | string | No | Search keyword (name/role/description) |
-| is_agent | bool | No | Filter Agent or human users |
-
-**Request Example:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "list",
-  "params": {
-    "is_agent": true
-  },
-  "id": 1
-}
-```
-
-**Response Example:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "contacts": [
-      {
-        "did": "did:wba:example.com:user:alice",
-        "name": "Alice",
-        "avatar": "https://example.com/avatar/alice.png",
-        "role": "assistant",
-        "description": "AI Assistant",
-        "is_agent": true,
-        "is_public": true,
-        "endpoint_url": "https://example.com/api/agent",
-        "created_at": "2024-01-15T10:00:00"
-      }
-    ],
-    "total": 1
-  },
-  "id": 1
-}
-```
-
-#### 5.3.2 get_detail — Get User Details
-
-Get detailed information of a specified public user.
-
-**Authentication:** none
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| contact_did | string | Yes | User DID |
-
-**Request Example:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "get_detail",
-  "params": {
-    "contact_did": "did:wba:example.com:user:alice"
-  },
-  "id": 1
-}
-```
-
-**Response Example:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "did": "did:wba:example.com:user:alice",
-    "name": "Alice",
-    "avatar": "https://example.com/avatar/alice.png",
-    "role": "assistant",
-    "description": "AI Assistant",
-    "is_agent": true,
-    "is_public": true,
-    "endpoint_url": "https://example.com/api/agent",
-    "created_at": "2024-01-15T10:00:00"
-  },
-  "id": 1
-}
-```
-
-#### 5.3.3 update_me — Update My Public Profile
-
-Update the public profile of the currently authenticated user.
-
-**Authentication:** did (**authentication required**)
-
-> Note: This method automatically identifies the current user through the DID in the authentication header; no user identifier needs to be passed in params.
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| name | string | No | User name |
-| avatar | string | No | Avatar URL |
-| role | string | No | Role |
-| description | string | No | Description |
-| endpoint_url | string | No | Endpoint URL |
-| is_public | bool | No | Whether public |
-
-**Request Example:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "update_me",
-  "params": {
-    "name": "Alice Updated",
-    "is_public": true
-  },
-  "id": 1
-}
-```
-
-**Response Example:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "did": "did:wba:example.com:user:alice",
-    "name": "Alice Updated",
-    "avatar": "https://example.com/avatar/alice.png",
-    "role": "assistant",
-    "description": "AI Assistant",
-    "is_agent": true,
-    "is_public": true,
-    "endpoint_url": "https://example.com/api/agent",
-    "created_at": "2024-01-15T10:00:00"
-  },
-  "id": 1
-}
-```
-
-**Possible Errors:**
-- `-32000`: Unauthenticated
-- `-32002`: User associated with DID does not exist
-
-## 6. Message Type Definitions
-
-### 6.1 Regular Message Types
+### 7.1 Regular Message Types
 
 | Type | Description | content |
 |------|-------------|---------|
@@ -914,7 +802,7 @@ Update the public profile of the currently authenticated user.
 | `image` | Image message | Image URL or Base64 encoded |
 | `file` | File message | File URL or file metadata |
 
-### 6.2 E2EE Message Types
+### 7.2 E2EE Message Types
 
 All E2EE messages are transmitted via the `content` field of the `send` method, where the content is a JSON serialized string. The server **does not parse** or **modify** the content, forwarding it transparently.
 
@@ -925,11 +813,11 @@ All E2EE messages are transmitted via the `content` field of the `send` method, 
 | `e2ee` | Encrypted message | Contains `secret_key_id`, `original_type`, `encrypted` (AES-GCM ciphertext) |
 | `e2ee_error` | E2EE error notification | Contains `error_code` and `secret_key_id` |
 
-See Section 7.3 for detailed E2EE content structure definitions.
+See Section 8.3 for detailed E2EE content structure definitions.
 
-## 7. End-to-End Encryption (E2EE) Protocol
+## 8. End-to-End Encryption (E2EE) Protocol
 
-### 7.1 Overview
+### 8.1 Overview
 
 This protocol's end-to-end encryption scheme is based on ECDHE (Elliptic Curve Diffie-Hellman Ephemeral) key exchange protocol, supporting encrypted communication between two Agents. The core encryption algorithms are consistent with [04-E2EE Communication Protocol Based on DID](message/04-end-to-end-encrypted-communication-technology-protocol-based-on-did.md).
 
@@ -939,7 +827,7 @@ This protocol's end-to-end encryption scheme is based on ECDHE (Elliptic Curve D
 - **Server-transparent forwarding**: All E2EE data is embedded in the `content` field of the `send` method; the server does not parse or modify encrypted data
 - **Unified transport**: Both E2EE handshake messages and encrypted messages are distinguished by the `type` field of the `send` method
 
-### 7.2 E2EE Handshake Flow
+### 8.2 E2EE Handshake Flow
 
 E2EE handshake exchanges handshake messages through the `send` method, entering the encrypted communication phase after key negotiation is complete.
 
@@ -986,11 +874,11 @@ Alice                           Message Server                          Bob
 4. **Both sessions activated**: After Bob processes Alice's Finished message, key negotiation is complete and sessions are activated on both sides.
 5. **Encrypted communication**: Both parties exchange encrypted content using `type=e2ee` messages.
 
-### 7.3 E2EE Content Structure Definitions
+### 8.3 E2EE Content Structure Definitions
 
 All E2EE data is transmitted via the `content` field of the `send` method (as JSON serialized strings).
 
-#### 7.3.1 SourceHello (e2ee_type=source_hello)
+#### 8.3.1 SourceHello (e2ee_type=source_hello)
 
 Sent by the E2EE session initiator, containing identity information, public key, and supported encryption parameters.
 
@@ -1086,7 +974,7 @@ Sent by the E2EE session initiator, containing identity information, public key,
 }
 ```
 
-#### 7.3.2 DestinationHello (e2ee_type=destination_hello)
+#### 8.3.2 DestinationHello (e2ee_type=destination_hello)
 
 Replied by the E2EE session receiver, containing selected encryption parameters.
 
@@ -1139,7 +1027,7 @@ Similar to SourceHello, with the following differences:
 }
 ```
 
-#### 7.3.3 Finished
+#### 8.3.3 Finished
 
 Handshake completion confirmation message, used to prevent replay attacks.
 
@@ -1171,7 +1059,7 @@ Handshake completion confirmation message, used to prevent replay attacks.
 }
 ```
 
-#### 7.3.4 Encrypted Message
+#### 8.3.4 Encrypted Message
 
 Messages encrypted with the negotiated ephemeral key.
 
@@ -1221,7 +1109,7 @@ Messages encrypted with the negotiated ephemeral key.
 }
 ```
 
-#### 7.3.5 E2EE Error Message
+#### 8.3.5 E2EE Error Message
 
 Notifies the other party to reinitiate key negotiation when a key expires or is not found.
 
@@ -1241,7 +1129,7 @@ Notifies the other party to reinitiate key negotiation when a key expires or is 
 }
 ```
 
-### 7.4 Key Negotiation Process
+### 8.4 Key Negotiation Process
 
 The key negotiation process is based on ECDHE (Elliptic Curve Diffie-Hellman Ephemeral), similar to the encryption key exchange process in TLS 1.3.
 
@@ -1252,13 +1140,13 @@ The key negotiation process is based on ECDHE (Elliptic Curve Diffie-Hellman Eph
 | Cipher Suite | `TLS_AES_128_GCM_SHA256` |
 | Elliptic Curve | `secp256r1` |
 
-#### 7.4.1 Shared Secret Generation
+#### 8.4.1 Shared Secret Generation
 
 1. **Obtain peer's public key**: Extract the elliptic curve public key (hexadecimal format) from the `key_shares`/`key_share`'s `key_exchange` field in the peer's Hello message.
 2. **Generate shared secret**: Use the local private key and peer's public key to generate a shared secret via the ECDH algorithm.
 3. **Determine key length**: Determine key length based on the cipher suite (`TLS_AES_128_GCM_SHA256` corresponds to 128 bits / 16 bytes).
 
-#### 7.4.2 Ephemeral Encryption Key Generation
+#### 8.4.2 Ephemeral Encryption Key Generation
 
 Use HKDF (HMAC-based Extract-and-Expand Key Derivation Function) to derive actual encryption keys from the shared secret:
 
@@ -1322,7 +1210,7 @@ destination_data_key = HKDF(
 
 Where `source_data_key` is the initiator's encryption key and `destination_data_key` is the receiver's encryption key. The Source encrypts messages using `source_data_key`, and the Destination decrypts using `source_data_key`; and vice versa.
 
-#### 7.4.3 secretKeyId Generation Method
+#### 8.4.3 secretKeyId Generation Method
 
 `secret_key_id` is the ephemeral encryption key ID between Source and Destination, used to identify which key encrypted a message. The key ID is only valid within the key's validity period.
 
@@ -1354,7 +1242,7 @@ def generate_secret_key_id(source_random: str, destination_random: str) -> str:
     return derived_key.hex()  # 16 hexadecimal characters
 ```
 
-#### 7.4.4 AES-GCM Encryption/Decryption
+#### 8.4.4 AES-GCM Encryption/Decryption
 
 Using `TLS_AES_128_GCM_SHA256` for message encryption:
 
@@ -1388,9 +1276,9 @@ def encrypt_aes_gcm(data: bytes, key: bytes) -> Dict[str, str]:
     }
 ```
 
-### 7.5 Signature and Verification
+### 8.5 Signature and Verification
 
-#### 7.5.1 proofValue Generation Process
+#### 8.5.1 proofValue Generation Process
 
 Both SourceHello and DestinationHello messages require signatures to ensure message integrity and identity verification.
 
@@ -1434,50 +1322,48 @@ signature = private_key.sign(msg_bytes, ec.ECDSA(hashes.SHA256()))
 msg["proof"]["proof_value"] = base64.urlsafe_b64encode(signature).decode('utf-8')
 ```
 
-#### 7.5.2 Verifying SourceHello/DestinationHello Messages
+#### 8.5.2 Verifying SourceHello/DestinationHello Messages
 
 1. **Parse message**: Extract all fields.
 2. **Verify DID and public key**: Read the `source_did` and public key from `verification_method`, use the DID generation method from the DID method specification to generate a DID from the public key, and confirm it matches `source_did`.
 3. **Verify signature**: Use the public key corresponding to `source_did` to verify whether the `proof` field signature is correct.
 4. **Verify other fields**: Check the randomness of the `random` field to prevent replay attacks; check the `created` field in `proof` to ensure the signature time has not expired.
 
-## 8. Security Considerations
+## 9. Security Considerations
 
-### 8.1 Transport Security
+### 9.1 Transport Security
 
 All API endpoints should use the HTTPS protocol to ensure encrypted transmission and integrity of data during communication.
 
-### 8.2 Identity Authentication Security
+### 9.2 Identity Authentication Security
 
-- **DID WBA Authentication**: Based on decentralized identity standards, users prove their identity by holding the private key corresponding to their DID.
-- **Bearer JWT**: JWT tokens should have reasonable expiration times to reduce the risk window of token leakage.
-- **Identity Consistency**: When authenticated users send messages, the server verifies the consistency between `sender_did` and the authenticated identity.
+Identity authentication follows the ANP DID WBA authentication mechanism. For detailed security considerations regarding DID-based authentication, see [DID:WBA Method Design Specification](03-did-wba-method-design-specification.md). When authenticated users send messages, the server verifies the consistency between `sender_did` and the authenticated identity.
 
-### 8.3 E2EE Security
+### 9.3 E2EE Security
 
 - **Server-transparent forwarding**: The `content` field of E2EE messages is opaque to the server; the server cannot read encrypted content.
 - **Forward secrecy**: Using ECDHE ephemeral key exchange, new key pairs are generated for each session. Even if long-term keys are compromised, past communications cannot be decrypted.
 - **Key validity period**: Ephemeral keys have explicit validity periods and must be renegotiated after expiration.
 
-### 8.4 Replay Attack Prevention
+### 9.4 Replay Attack Prevention
 
 - **random field**: The `random` field in SourceHello and DestinationHello ensures the uniqueness of each handshake.
 - **secretKeyId verification**: The Finished message contains `secret_key_id` for verifying the integrity of key negotiation.
 - **Timestamp verification**: The `created` field in `proof` is used to check whether the signature time is within a reasonable range.
 
-## 9. Limitations
+## 10. Limitations
 
-### 9.1 E2EE Limited to Private Chat
+### 10.1 E2EE Limited to Private Chat
 
 The current E2EE scheme only supports one-to-one encrypted communication between two Agents and does not support end-to-end encryption in group chat scenarios. Group messages are forwarded in plaintext through the server. A group E2EE scheme (such as the MLS protocol) may be introduced in the future.
 
-### 9.2 Large File Transfer Efficiency
+### 10.2 Large File Transfer Efficiency
 
 Message content is transmitted via the `content` field in JSON, which is not efficient for large files (such as videos). It is recommended to transmit the file's URL and decryption key in the `content`, and the receiver downloads the file separately via HTTPS or other protocols.
 
-## 10. Summary and Future Directions
+## 11. Summary and Future Directions
 
-This specification defines an instant messaging protocol based on HTTP + JSON-RPC 2.0, using `did:wba` as the identity identifier, supporting private chat, group chat, directory management, and end-to-end encrypted communication. Compared to the original WebSocket scheme, this protocol offers better simplicity, compatibility, and extensibility.
+This specification defines an instant messaging protocol based on HTTP + JSON-RPC 2.0, using `did:wba` as the identity identifier, supporting private chat, group chat, and end-to-end encrypted communication. Through integration with the Agent Description Protocol, agents can declare their E2EE IM capabilities in a standardized manner, enabling automatic discovery and interoperability. Compared to the original WebSocket scheme, this protocol offers better simplicity, compatibility, and extensibility.
 
 Future work directions include:
 

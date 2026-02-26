@@ -4,7 +4,7 @@
 
 ## 摘要
 
-本规范定义了 ANP 端到端即时消息协议，这是一个基于 HTTP 和 JSON-RPC 2.0 的即时消息协议，支持私聊、群聊、通讯录管理和端到端加密（E2EE）通信。协议使用 `did:wba` 作为身份标识，采用 DID WBA 认证机制进行身份验证。
+本规范定义了 ANP 端到端即时消息协议，这是一个基于 HTTP 和 JSON-RPC 2.0 的即时消息协议，支持私聊、群聊和端到端加密（E2EE）通信。协议使用 `did:wba` 作为身份标识，采用 DID WBA 认证机制进行身份验证。
 
 本规范替代原有的 [04-基于DID的端到端加密通信技术协议](chinese/message/04-基于did的端到端加密通信技术协议.md) 和 [05-基于DID的消息服务协议](chinese/message/05-基于did的消息服务协议.md) 中基于 WebSocket 的方案，在保留 E2EE 核心加密逻辑的基础上，将传输层协议统一为 HTTP + JSON-RPC 2.0。
 
@@ -55,7 +55,7 @@ HTTP + JSON-RPC 2.0 方案具有以下优势：
 ```
 
 - **Agent**：消息的发送者和接收者，通过 `did:wba` 进行身份标识。
-- **Message Server**：为 Agent 提供消息收发服务，包括消息存储、收件箱管理、群组管理和通讯录服务。
+- **Message Server**：为 Agent 提供消息收发服务，包括消息存储、收件箱管理和群组管理。
 - Agent 与其所属的 Message Server 之间通过 HTTP JSON-RPC 2.0 协议通信。
 - Message Server 之间的通信协议不在本规范的范围内。
 
@@ -66,10 +66,9 @@ HTTP + JSON-RPC 2.0 方案具有以下优势：
 | **传输协议** | HTTP + JSON-RPC 2.0 |
 | **内容格式** | `application/json` |
 | **身份标识** | `did:wba` (Decentralized Identifier) |
-| **认证方式** | DID WBA 认证 + Bearer JWT |
+| **认证方式** | DID WBA 认证（详见 [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)） |
 | **消息类型** | 私聊、群聊 |
 | **E2EE 支持** | 基于 ECDHE 的端到端加密（仅私聊） |
-| **通讯录** | 公共通讯录管理 |
 
 ### 2.3 设计原则
 
@@ -104,33 +103,7 @@ did:wba:{domain}:group:{group_id}
 
 ### 3.2 认证方式
 
-本协议支持两种认证方式：
-
-#### 3.2.1 DID WBA 认证
-
-通过 HTTP 请求头传递 DID WBA 认证信息：
-
-```
-Authorization: DID <wba-auth-header>
-```
-
-服务端收到 DID WBA 认证请求后，转发到 user-service 进行验证。验证成功后返回 JWT 令牌，后续请求可使用 Bearer JWT 认证。
-
-#### 3.2.2 Bearer JWT 认证
-
-DID WBA 验证成功后，后续请求可使用 JWT 令牌认证：
-
-```
-Authorization: Bearer <token>
-```
-
-认证信息由中间件解析，各 RPC 方法根据自身的认证要求进行检查。认证要求分为三个级别：
-
-| 级别 | 说明 |
-|------|------|
-| **none** | 不需要认证 |
-| **optional** | 可选认证，已认证用户会进行身份一致性校验 |
-| **did** | 必须认证 |
+本协议采用 ANP 统一的 DID WBA 认证机制进行身份验证。完整的认证流程和技术细节详见 [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)。
 
 ## 4. JSON-RPC 2.0 传输协议
 
@@ -199,15 +172,89 @@ Authorization: Bearer <token>
 
 所有接口均通过 HTTP POST 方法调用，请求体为 JSON-RPC 2.0 格式的 JSON 对象。
 
-## 5. 消息服务 API 定义
+## 5. 智能体描述协议集成
 
-本协议定义了 13 个 JSON-RPC 方法，分布在三个服务端点上。
+本节描述如何在智能体描述（Agent Description, AD）文档中声明 E2EE 即时消息能力，使其他智能体能够自动发现并与 E2EE IM 服务进行交互。ANP E2EE IM 协议作为内置协议类型纳入智能体描述协议框架（完整的 AD 规范详见[智能体描述协议规范](chinese/07-ANP-智能体描述协议规范.md)）。
 
-### 5.1 消息接口
+### 5.1 在 AD 文档中声明 E2EE IM 支持
+
+支持 ANP E2EE IM 协议的智能体应在其 AD 文档的 `interfaces` 数组中包含相应条目。由于 E2EE IM 协议是 ANP 内置协议，接口描述使用 `content` 字段进行内联端点和能力声明，而非通过 `url` 引用外部文件。
+
+**AD 文档示例：**
+
+```json
+{
+  "protocolType": "ANP",
+  "protocolVersion": "1.0.0",
+  "type": "AgentDescription",
+  "name": "示例聊天智能体",
+  "did": "did:wba:example.com:user:alice",
+  "interfaces": [
+    {
+      "type": "StructuredInterface",
+      "protocol": "ANP-E2EE-IM",
+      "version": "1.0",
+      "description": "ANP E2EE 即时消息协议，支持私聊、群聊和端到端加密通信。",
+      "content": {
+        "endpoints": [
+          {
+            "path": "/api/v1/messages/rpc",
+            "description": "消息服务端点，用于发送、接收和管理消息，包括 E2EE 加密消息"
+          },
+          {
+            "path": "/api/v1/groups/rpc",
+            "description": "群组服务端点，用于群组管理和群组消息"
+          }
+        ],
+        "e2ee": {
+          "supported_versions": ["1.0"],
+          "cipher_suites": ["TLS_AES_128_GCM_SHA256"],
+          "supported_groups": ["secp256r1"],
+          "description": "E2EE 能力：ECDHE 密钥交换、AES-GCM 加密，仅支持私聊"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 5.2 字段说明
+
+**接口级别字段：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 是 | 固定为 `"StructuredInterface"` |
+| protocol | string | 是 | 固定为 `"ANP-E2EE-IM"`，标识本协议 |
+| version | string | 是 | 协议版本号（如 `"1.0"`） |
+| description | string | 否 | 接口的可读描述 |
+| content | object | 是 | 内联描述端点和 E2EE 能力 |
+
+**content.endpoints 元素：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| path | string | 是 | API 端点路径（如 `/api/v1/messages/rpc`） |
+| description | string | 否 | 端点功能描述 |
+
+**content.e2ee 字段：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| supported_versions | array | 是 | 支持的 E2EE 协议版本列表 |
+| cipher_suites | array | 是 | 支持的加密套件列表（如 `["TLS_AES_128_GCM_SHA256"]`） |
+| supported_groups | array | 是 | 支持的椭圆曲线组列表（如 `["secp256r1"]`） |
+| description | string | 否 | E2EE 能力的可读描述 |
+
+## 6. 消息服务 API 定义
+
+本协议定义了 10 个 JSON-RPC 方法，分布在两个服务端点上。
+
+### 6.1 消息接口
 
 **端点：** `POST /api/v1/messages/rpc`
 
-#### 5.1.1 send — 发送消息
+#### 6.1.1 send — 发送消息
 
 发送消息（私聊或群聊），同时也是 E2EE 握手和加密消息的统一传输方法。
 
@@ -293,9 +340,9 @@ Authorization: Bearer <token>
 }
 ```
 
-E2EE 消息的请求示例详见第 7 节。
+E2EE 消息的请求示例详见第 8 节。
 
-#### 5.1.2 get_detail — 获取消息详情
+#### 6.1.2 get_detail — 获取消息详情
 
 获取指定消息的详细信息。
 
@@ -340,7 +387,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.1.3 get_inbox — 查询收件箱
+#### 6.1.3 get_inbox — 查询收件箱
 
 查询当前用户的收件箱消息。
 
@@ -397,7 +444,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.1.4 mark_read — 标记已读
+#### 6.1.4 mark_read — 标记已读
 
 标记指定消息为已读。
 
@@ -436,7 +483,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.1.5 get_history — 获取会话历史
+#### 6.1.5 get_history — 获取会话历史
 
 获取私聊或群聊的消息历史记录。
 
@@ -506,7 +553,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.1.6 get_batch_history — 批量获取群聊历史
+#### 6.1.6 get_batch_history — 批量获取群聊历史
 
 批量获取多个群聊的消息历史。
 
@@ -561,7 +608,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.1.7 delete_inbox — 删除收件箱消息
+#### 6.1.7 delete_inbox — 删除收件箱消息
 
 删除收件箱中的指定消息。
 
@@ -600,11 +647,11 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-### 5.2 群组接口
+### 6.2 群组接口
 
 **端点：** `POST /api/v1/groups/rpc`
 
-#### 5.2.1 list — 获取公开群组列表
+#### 6.2.1 list — 获取公开群组列表
 
 获取平台上所有公开的群组。
 
@@ -650,7 +697,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.2.2 get_detail — 获取群组详情
+#### 6.2.2 get_detail — 获取群组详情
 
 获取指定群组的详细信息。
 
@@ -692,7 +739,7 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-#### 5.2.3 get_messages — 获取群组消息
+#### 6.2.3 get_messages — 获取群组消息
 
 获取指定群组的消息列表。
 
@@ -745,168 +792,9 @@ E2EE 消息的请求示例详见第 7 节。
 }
 ```
 
-### 5.3 通讯录接口
+## 7. 消息类型定义
 
-**端点：** `POST /api/v1/directory/rpc`
-
-#### 5.3.1 list — 获取公共通讯录
-
-获取平台上公开的用户和 Agent 列表。
-
-**认证：** none
-
-**参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| skip | int | 否 | 跳过条数，默认 0 |
-| limit | int | 否 | 返回条数，默认 50，最大 100 |
-| search | string | 否 | 搜索关键词（姓名/角色/描述） |
-| is_agent | bool | 否 | 筛选 Agent 或人类用户 |
-
-**请求示例：**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "list",
-  "params": {
-    "is_agent": true
-  },
-  "id": 1
-}
-```
-
-**响应示例：**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "contacts": [
-      {
-        "did": "did:wba:example.com:user:alice",
-        "name": "Alice",
-        "avatar": "https://example.com/avatar/alice.png",
-        "role": "assistant",
-        "description": "AI 助手",
-        "is_agent": true,
-        "is_public": true,
-        "endpoint_url": "https://example.com/api/agent",
-        "created_at": "2024-01-15T10:00:00"
-      }
-    ],
-    "total": 1
-  },
-  "id": 1
-}
-```
-
-#### 5.3.2 get_detail — 获取用户详情
-
-获取指定公开用户的详细信息。
-
-**认证：** none
-
-**参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| contact_did | string | 是 | 用户 DID |
-
-**请求示例：**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "get_detail",
-  "params": {
-    "contact_did": "did:wba:example.com:user:alice"
-  },
-  "id": 1
-}
-```
-
-**响应示例：**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "did": "did:wba:example.com:user:alice",
-    "name": "Alice",
-    "avatar": "https://example.com/avatar/alice.png",
-    "role": "assistant",
-    "description": "AI 助手",
-    "is_agent": true,
-    "is_public": true,
-    "endpoint_url": "https://example.com/api/agent",
-    "created_at": "2024-01-15T10:00:00"
-  },
-  "id": 1
-}
-```
-
-#### 5.3.3 update_me — 更新我的公开资料
-
-更新当前认证用户的公开资料。
-
-**认证：** did（**必须认证**）
-
-> 注意：此方法通过认证头中的 DID 自动识别当前用户，无需在 params 中传递用户标识。
-
-**参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| name | string | 否 | 用户名称 |
-| avatar | string | 否 | 头像 URL |
-| role | string | 否 | 角色 |
-| description | string | 否 | 描述 |
-| endpoint_url | string | 否 | 连接地址 |
-| is_public | bool | 否 | 是否公开 |
-
-**请求示例：**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "update_me",
-  "params": {
-    "name": "Alice Updated",
-    "is_public": true
-  },
-  "id": 1
-}
-```
-
-**响应示例：**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "did": "did:wba:example.com:user:alice",
-    "name": "Alice Updated",
-    "avatar": "https://example.com/avatar/alice.png",
-    "role": "assistant",
-    "description": "AI 助手",
-    "is_agent": true,
-    "is_public": true,
-    "endpoint_url": "https://example.com/api/agent",
-    "created_at": "2024-01-15T10:00:00"
-  },
-  "id": 1
-}
-```
-
-**可能的错误：**
-- `-32000`：未认证
-- `-32002`：DID 关联的用户不存在
-
-## 6. 消息类型定义
-
-### 6.1 普通消息类型
+### 7.1 普通消息类型
 
 | 类型 | 说明 | content 内容 |
 |------|------|-------------|
@@ -914,7 +802,7 @@ E2EE 消息的请求示例详见第 7 节。
 | `image` | 图片消息 | 图片 URL 或 Base64 编码 |
 | `file` | 文件消息 | 文件 URL 或文件元数据 |
 
-### 6.2 E2EE 消息类型
+### 7.2 E2EE 消息类型
 
 所有 E2EE 消息通过 `send` 方法的 `content` 字段传输，content 内容为 JSON 序列化后的字符串。服务端**不解析**也**不修改** content 内容，直接透明转发。
 
@@ -925,11 +813,11 @@ E2EE 消息的请求示例详见第 7 节。
 | `e2ee` | 加密消息 | 含 `secret_key_id`、`original_type`、`encrypted`（AES-GCM 密文） |
 | `e2ee_error` | E2EE 错误通知 | 含 `error_code` 和 `secret_key_id` |
 
-E2EE content 结构的详细定义见第 7.3 节。
+E2EE content 结构的详细定义见第 8.3 节。
 
-## 7. 端到端加密（E2EE）协议
+## 8. 端到端加密（E2EE）协议
 
-### 7.1 概述
+### 8.1 概述
 
 本协议的端到端加密方案基于 ECDHE（Elliptic Curve Diffie-Hellman Ephemeral）密钥交换协议，支持两个 Agent 之间的加密通信。核心加密算法与 [04-基于DID的端到端加密通信技术协议](chinese/message/04-基于did的端到端加密通信技术协议.md) 一致。
 
@@ -939,7 +827,7 @@ E2EE content 结构的详细定义见第 7.3 节。
 - **服务端透明转发**：所有 E2EE 数据嵌入 `send` 方法的 `content` 字段，服务端不解析或修改加密数据
 - **统一传输**：E2EE 握手消息和加密消息都通过 `send` 方法的 `type` 字段区分类型
 
-### 7.2 E2EE 握手流程
+### 8.2 E2EE 握手流程
 
 E2EE 握手通过 `send` 方法交换握手消息，完成密钥协商后进入加密通信阶段。
 
@@ -986,11 +874,11 @@ Alice                           Message Server                          Bob
 4. **双方会话激活**：Bob 处理 Alice 的 Finished 消息后，双方密钥协商完成，会话激活。
 5. **加密通信**：双方使用 `type=e2ee` 类型的消息互发加密内容。
 
-### 7.3 E2EE content 结构定义
+### 8.3 E2EE content 结构定义
 
 所有 E2EE 数据都通过 `send` 方法的 `content` 字段传输（JSON 序列化字符串）。
 
-#### 7.3.1 SourceHello（e2ee_type=source_hello）
+#### 8.3.1 SourceHello（e2ee_type=source_hello）
 
 由 E2EE 会话发起方发送，包含身份信息、公钥和支持的加密参数。
 
@@ -1086,7 +974,7 @@ Alice                           Message Server                          Bob
 }
 ```
 
-#### 7.3.2 DestinationHello（e2ee_type=destination_hello）
+#### 8.3.2 DestinationHello（e2ee_type=destination_hello）
 
 由 E2EE 会话接收方回复，包含选定的加密参数。
 
@@ -1139,7 +1027,7 @@ Alice                           Message Server                          Bob
 }
 ```
 
-#### 7.3.3 Finished
+#### 8.3.3 Finished
 
 握手完成确认消息，用于防止重放攻击。
 
@@ -1171,7 +1059,7 @@ Alice                           Message Server                          Bob
 }
 ```
 
-#### 7.3.4 加密消息
+#### 8.3.4 加密消息
 
 使用协商的短期密钥加密的消息。
 
@@ -1221,7 +1109,7 @@ Alice                           Message Server                          Bob
 }
 ```
 
-#### 7.3.5 E2EE 错误消息
+#### 8.3.5 E2EE 错误消息
 
 当密钥过期或未找到时，通知对方重新发起密钥协商。
 
@@ -1241,7 +1129,7 @@ Alice                           Message Server                          Bob
 }
 ```
 
-### 7.4 密钥协商过程
+### 8.4 密钥协商过程
 
 密钥协商过程基于 ECDHE（Elliptic Curve Diffie-Hellman Ephemeral），与 TLS 1.3 中交换加密密钥的过程基本类似。
 
@@ -1252,13 +1140,13 @@ Alice                           Message Server                          Bob
 | 密码套件 | `TLS_AES_128_GCM_SHA256` |
 | 椭圆曲线 | `secp256r1` |
 
-#### 7.4.1 共享密钥生成
+#### 8.4.1 共享密钥生成
 
 1. **获取对方公钥**：从对方 Hello 消息的 `key_shares`/`key_share` 中的 `key_exchange` 字段提取椭圆曲线公钥（十六进制格式）。
 2. **生成共享秘密**：使用本地私钥和对方公钥，通过 ECDH 算法生成共享秘密。
 3. **确定密钥长度**：根据密码套件确定密钥长度（`TLS_AES_128_GCM_SHA256` 对应 128 位 / 16 字节）。
 
-#### 7.4.2 短期加密密钥生成
+#### 8.4.2 短期加密密钥生成
 
 使用 HKDF（HMAC-based Extract-and-Expand Key Derivation Function）从共享秘密派生实际加密密钥：
 
@@ -1322,7 +1210,7 @@ destination_data_key = HKDF(
 
 其中 `source_data_key` 为发起方加密密钥，`destination_data_key` 为接收方加密密钥。Source 发送消息时使用 `source_data_key` 加密，Destination 使用 `source_data_key` 解密；反之亦然。
 
-#### 7.4.3 secretKeyId 生成方法
+#### 8.4.3 secretKeyId 生成方法
 
 `secret_key_id` 是 Source 和 Destination 之间的短期加密密钥 ID，用于标识消息使用哪个密钥加密。密钥 ID 仅在密钥有效期内有效。
 
@@ -1354,7 +1242,7 @@ def generate_secret_key_id(source_random: str, destination_random: str) -> str:
     return derived_key.hex()  # 16 个十六进制字符
 ```
 
-#### 7.4.4 AES-GCM 加密/解密
+#### 8.4.4 AES-GCM 加密/解密
 
 使用 `TLS_AES_128_GCM_SHA256` 进行消息加密：
 
@@ -1388,9 +1276,9 @@ def encrypt_aes_gcm(data: bytes, key: bytes) -> Dict[str, str]:
     }
 ```
 
-### 7.5 签名与验证
+### 8.5 签名与验证
 
-#### 7.5.1 proofValue 生成过程
+#### 8.5.1 proofValue 生成过程
 
 SourceHello 和 DestinationHello 消息都需要签名以确保消息完整性和身份验证。
 
@@ -1434,50 +1322,48 @@ signature = private_key.sign(msg_bytes, ec.ECDSA(hashes.SHA256()))
 msg["proof"]["proof_value"] = base64.urlsafe_b64encode(signature).decode('utf-8')
 ```
 
-#### 7.5.2 验证 SourceHello/DestinationHello 消息
+#### 8.5.2 验证 SourceHello/DestinationHello 消息
 
 1. **解析消息**：提取各个字段。
 2. **验证 DID 与公钥**：读取 `source_did` 和 `verification_method` 中的公钥，使用 DID 方法规范中的 DID 生成方法，用公钥生成 DID，确认是否与 `source_did` 一致。
 3. **验证签名**：使用 `source_did` 对应的公钥，验证 `proof` 字段的签名是否正确。
 4. **验证其他字段**：检查 `random` 字段的随机性，防止重放攻击；检查 `proof` 的 `created` 字段，确保签名时间未过期。
 
-## 8. 安全性考虑
+## 9. 安全性考虑
 
-### 8.1 传输安全
+### 9.1 传输安全
 
 所有 API 端点应使用 HTTPS 协议，确保通信过程中数据的加密传输和完整性。
 
-### 8.2 身份认证安全
+### 9.2 身份认证安全
 
-- **DID WBA 认证**：基于去中心化身份标准，用户通过持有 DID 对应的私钥证明身份。
-- **Bearer JWT**：JWT 令牌设置合理的过期时间，减少令牌泄露的风险窗口。
-- **身份一致性**：已认证用户发送消息时，服务端校验 `sender_did` 与认证身份的一致性。
+身份认证遵循 ANP DID WBA 认证机制。有关基于 DID 的身份认证安全详细说明，请参见 [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)。已认证用户发送消息时，服务端校验 `sender_did` 与认证身份的一致性。
 
-### 8.3 E2EE 安全
+### 9.3 E2EE 安全
 
 - **服务端透明转发**：E2EE 消息的 `content` 字段对服务端不透明，服务端无法读取加密内容。
 - **前向安全性**：使用 ECDHE 临时密钥交换，每次会话生成新的密钥对，即使长期密钥泄露，过去的通信也无法被解密。
 - **密钥有效期**：短期密钥有明确的有效期，过期后必须重新协商。
 
-### 8.4 防重放攻击
+### 9.4 防重放攻击
 
 - **random 字段**：SourceHello 和 DestinationHello 中的 `random` 字段确保每次握手的唯一性。
 - **secretKeyId 校验**：Finished 消息中包含 `secret_key_id`，用于验证密钥协商的完整性。
 - **时间戳校验**：`proof` 中的 `created` 字段用于检查签名时间是否在合理范围内。
 
-## 9. 局限性
+## 10. 局限性
 
-### 9.1 E2EE 仅限私聊
+### 10.1 E2EE 仅限私聊
 
 当前 E2EE 方案仅支持两个 Agent 之间的一对一加密通信，不支持群聊场景下的端到端加密。群聊消息通过服务端明文转发。未来可能引入群组 E2EE 方案（如 MLS 协议）。
 
-### 9.2 大文件传输效率
+### 10.2 大文件传输效率
 
 消息内容通过 JSON 的 `content` 字段传输，对于大文件（如视频）的传输效率不高。建议在 `content` 中传递文件的 URL 和解密密钥，接收者通过 HTTPS 等协议单独下载文件。
 
-## 10. 总结与展望
+## 11. 总结与展望
 
-本规范定义了基于 HTTP + JSON-RPC 2.0 的即时消息协议，以 `did:wba` 为身份标识，支持私聊、群聊、通讯录管理和端到端加密通信。相比原有的 WebSocket 方案，本协议具有更好的简单性、兼容性和可扩展性。
+本规范定义了基于 HTTP + JSON-RPC 2.0 的即时消息协议，以 `did:wba` 为身份标识，支持私聊、群聊和端到端加密通信。通过与智能体描述协议的集成，智能体可以以标准化方式声明其 E2EE IM 能力，实现自动发现和互操作。相比原有的 WebSocket 方案，本协议具有更好的简单性、兼容性和可扩展性。
 
 未来的工作方向包括：
 
