@@ -281,13 +281,13 @@ The client sends the following information through the `Authorization` header fi
 - **signature**: Sign the `nonce`, `timestamp`, service domain, and client DID. For ECDSA signatures, use the R|S format. It includes the following fields:
   - `nonce`
   - `timestamp`
-  - `service` (the domain name of the service)
+  - `aud` (the domain name of the service)
   - `did` (the DID of the client)
 
 Client request example:
 
 ```plaintext
-Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123", timestamp="2024-12-05T12:34:56Z", verification_method="key-1", signature="base64url(signature_of_nonce_timestamp_service_did)"
+Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123", timestamp="2024-12-05T12:34:56Z", verification_method="key-1", signature="base64url(signature_of_nonce_timestamp_aud_did)"
 ```
 
 #### 3.1.2 Signature Generation Process
@@ -298,8 +298,8 @@ Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123
 { 
   "nonce": "abc123", 
   "timestamp": "2024-12-05T12:34:56Z", 
-  "service": "example.com", 
-  "did": "did:wba:example.com:user:alice" 
+  "aud": "example.com",
+  "did": "did:wba:example.com:user:alice"
 }
 ```
 
@@ -333,7 +333,7 @@ After receiving the client's request, the service performs the following verific
 
 #### 3.2.2 Signature Verification Process
 
-1. **Extract Information**: Extract `nonce`, `timestamp`, `service`, `did`, and `verification_method` from the `Authorization` header.
+1. **Extract Information**: Extract `nonce`, `timestamp`, `aud`, `did`, and `verification_method` from the `Authorization` header.
 
 2. **Build Verification String**: Construct a JSON string identical to the one constructed by the client:
 
@@ -341,8 +341,8 @@ After receiving the client's request, the service performs the following verific
 { 
     "nonce": "abc123", 
     "timestamp": "2024-12-05T12:34:56Z", 
-    "service": "example.com", 
-    "did": "did:wba:example.com:user:alice" 
+    "aud": "example.com",
+    "did": "did:wba:example.com:user:alice"
 }
 ```
 
@@ -477,7 +477,7 @@ The client needs to send the following information to the server:
 - **signature**: Signs the `nonce`, `timestamp`, server domain, and client DID. For ECDSA signatures, uses R|S format. Includes the following fields:
   - `nonce`: A randomly generated string
   - `timestamp`: The time when the request is initiated
-  - `service`: The server's domain name (note: the domain name does not include the port)
+  - `aud`: The server's domain name (note: the domain name does not include the port)
   - `did`: The client's DID
 
 Client request example:
@@ -488,7 +488,7 @@ Client request example:
   "nonce": "abc123",
   "timestamp": "2024-12-05T12:34:56Z",
   "verification_method": "key-1",
-  "signature": "base64url(signature_of_nonce_timestamp_service_did)"
+  "signature": "base64url(signature_of_nonce_timestamp_aud_did)"
 }
 ```
 

@@ -279,12 +279,12 @@ sequenceDiagram
 - **signature**：对 `nonce`、`timestamp` 、服务端域名、客户端DID进行签名。对于ECDSA签名，使用R|S格式。包括以下字段：
   - `nonce`: 随机生成的字符串
   - `timestamp`: 请求发起时的时间
-  - `service`: 服务端域名(注意，域名中不包含端口，示例：example.com，如果服务端是ip，则使用ip地址)
+  - `aud`: 服务端域名(注意，域名中不包含端口，示例：example.com，如果服务端是ip，则使用ip地址)
   - `did`: 客户端的 DID
 客户端请求示例：
 
 ```plaintext
-Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123", timestamp="2024-12-05T12:34:56Z", verification_method="key-1", signature="base64url(signature_of_nonce_timestamp_service_did)"
+Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123", timestamp="2024-12-05T12:34:56Z", verification_method="key-1", signature="base64url(signature_of_nonce_timestamp_aud_did)"
 ```
 
 #### 3.1.2 签名生成流程
@@ -295,7 +295,7 @@ Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123
 {
   "nonce": "abc123",
   "timestamp": "2024-12-05T12:34:56Z",
-  "service": "example.com",
+  "aud": "example.com",
   "did": "did:wba:example.com:user:alice"
 }
 ```
@@ -331,7 +331,7 @@ Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123
 
 #### 3.2.2 验证签名过程
 
-1. **提取信息**：从 `Authorization` 头部提取 `nonce`、`timestamp`、`service`、`did`、`verification_method` 和 `signature`。
+1. **提取信息**：从 `Authorization` 头部提取 `nonce`、`timestamp`、`aud`、`did`、`verification_method` 和 `signature`。
 
 2. **构建验证字符串**：使用提取的信息构建与客户端相同的JSON字符串：
 
@@ -339,7 +339,7 @@ Authorization: DIDWba did="did:wba:example.com%3A8800:user:alice", nonce="abc123
 {
     "nonce": "abc123",
     "timestamp": "2024-12-05T12:34:56Z",
-    "service": "example.com",
+    "aud": "example.com",
     "did": "did:wba:example.com:user:alice"
 }
 ```
@@ -474,7 +474,7 @@ sequenceDiagram
 - **signature**：对 `nonce`、`timestamp` 、服务端域名、客户端DID进行签名。对于ECDSA签名，使用R|S格式。包括以下字段：
   - `nonce`
   - `timestamp`
-  - `service`（服务的域名）
+  - `aud`（服务的域名）
   - `did`（客户端的 DID）
 
 客户端请求示例：
@@ -485,7 +485,7 @@ sequenceDiagram
   "nonce": "abc123",
   "timestamp": "2024-12-05T12:34:56Z",
   "verification_method": "key-1",
-  "signature": "base64url(signature_of_nonce_timestamp_service_did)"
+  "signature": "base64url(signature_of_nonce_timestamp_aud_did)"
 }
 ```
 
