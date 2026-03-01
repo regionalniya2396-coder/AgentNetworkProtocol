@@ -88,10 +88,29 @@ Apart from the DID Core specification, most other specifications are still in dr
           "kty": "EC",
           "kid": "WjKgJV7VRw3hmgU6--4v15c0Aewbcvat1BsRFTIqa5Q"
         }
+      },
+      {
+        "id": "did:wba:example.com%3A8800:user:alice#keys-p256-1",
+        "type": "EcdsaSecp256r1VerificationKey2019",
+        "controller": "did:wba:example.com%3A8800:user:alice",
+        "publicKeyJwk": {
+          "crv": "P-256",
+          "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+          "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+          "kty": "EC",
+          "kid": "keys-p256-1"
+        }
+      },
+      {
+        "id": "did:wba:example.com%3A8800:user:alice#key-x25519-1",
+        "type": "X25519KeyAgreementKey2019",
+        "controller": "did:wba:example.com%3A8800:user:alice",
+        "publicKeyMultibase": "z9hFgmPVfmBZwRvFEyniQDBkz9LmV7gDEqytWyGZLmDXE"
       }
     ],
     "authentication": [
       "did:wba:example.com%3A8800:user:alice#WjKgJV7VRw3hmgU6--4v15c0Aewbcvat1BsRFTIqa5Q",
+      "did:wba:example.com%3A8800:user:alice#keys-p256-1",
       {
         "id": "did:wba:example.com%3A8800:user:alice#key-1",
         "type": "Ed25519VerificationKey2020",
@@ -100,12 +119,7 @@ Apart from the DID Core specification, most other specifications are still in dr
       }
     ],
     "keyAgreement": [
-      {
-        "id": "did:wba:example.com%3A8800:user:alice#key-2",
-        "type": "X25519KeyAgreementKey2019", 
-        "controller": "did:wba:example.com%3A8800:user:alice",
-        "publicKeyMultibase": "z9hFgmPVfmBZwRvFEyniQDBkz9LmV7gDEqytWyGZLmDXE"
-      }
+      "did:wba:example.com%3A8800:user:alice#key-x25519-1"
     ],
     "humanAuthorization": [
       "did:wba:example.com%3A8800:user:alice#WjKgJV7VRw3hmgU6--4v15c0Aewbcvat1BsRFTIqa5Q",
@@ -115,7 +129,7 @@ Apart from the DID Core specification, most other specifications are still in dr
         "controller": "did:wba:example.com%3A8800:user:alice",
         "publicKeyMultibase": "z9XK2BVwLNv6gmMNbm4uVAjZpfkcJDwDwnZn6z3wweKLo"
       }
-    ],    
+    ],
     "service": [
       {
         "id": "did:wba:example.com%3A8800:user:alice#agent-description",
@@ -132,7 +146,7 @@ Apart from the DID Core specification, most other specifications are still in dr
 
 - **id**: Required field. Cannot contain IP addresses but may include ports. When ports are included, colons must be encoded as %3A. Paths are separated using colons.
 
-- **verificationMethod**: Required field. Contains an array of verification methods that define public key information for verifying the DID subject.
+- **verificationMethod**: Required field. Contains an array of verification methods that define public key information for verifying the DID subject. For scenarios requiring end-to-end encryption (E2EE) communication, `verificationMethod` SHOULD include both signing keys and key agreement keys to achieve key separation. Signing keys (e.g., EcdsaSecp256r1VerificationKey2019) are used for identity authentication and E2EE proof signatures; key agreement keys (e.g., X25519KeyAgreementKey2019) are used for HPKE key encapsulation. Each type of key serves its own purpose, so that the compromise of a single key does not simultaneously affect both identity authentication and communication confidentiality.
   - **Sub-fields**:
     - **id**: Unique identifier for the verification method
     - **type**: Type of verification method
@@ -146,7 +160,7 @@ Apart from the DID Core specification, most other specifications are still in dr
     - **controller**: DID that controls this verification method
     - **publicKeyMultibase**: Public key information in Multibase format
 
-- **keyAgreement**: Optional field. Defines public key information used for key agreement between DIDs for encrypted communication. Verification methods typically use key agreement algorithms suitable for key exchange, such as X25519KeyAgreementKey2019.
+- **keyAgreement**: Optional field. Defines public key information used for key agreement between DIDs for encrypted communication. Verification methods typically use key agreement algorithms suitable for key exchange, such as X25519KeyAgreementKey2019. `keyAgreement` can be either a string reference (pointing to an entry in `verificationMethod`) or an embedded object. For end-to-end encryption (E2EE) scenarios (see [09-ANP E2EE Instant Messaging Protocol Specification](/09-anp-e2ee-instant-messaging-protocol-specification.md)), this field is used for HPKE key encapsulation and SHOULD contain an entry of type `X25519KeyAgreementKey2019`. If a DID document has no `keyAgreement` field or no X25519 type entry, it indicates that the agent does not support E2EE.
   - **Sub-fields**:
     - **id**: Unique identifier for the key agreement method
     - **type**: Type of key agreement method
@@ -167,8 +181,9 @@ Apart from the DID Core specification, most other specifications are still in dr
 
 > Note:
 > 1. Public key information currently supports two formats: publicKeyJwk and publicKeyMultibase. For details, see [https://www.w3.org/TR/did-extensions-properties/#verification-method-properties](https://www.w3.org/TR/did-extensions-properties/#verification-method-properties).
-> 2. The definitions of verification method types can be found at [https://www.w3.org/TR/did-extensions-properties/#verification-method-types](https://www.w3.org/TR/did-extensions-properties/#verification-method-types). The currently supported types are: EcdsaSecp256k1VerificationKey2019, Ed25519VerificationKey2018, X25519KeyAgreementKey2019. (Ed25519VerificationKey2020, JsonWebKey2020, etc. are not currently supported.)
+> 2. The definitions of verification method types can be found at [https://www.w3.org/TR/did-extensions-properties/#verification-method-types](https://www.w3.org/TR/did-extensions-properties/#verification-method-types). The currently supported types are: EcdsaSecp256k1VerificationKey2019, EcdsaSecp256r1VerificationKey2019, Ed25519VerificationKey2018, Ed25519VerificationKey2020, X25519KeyAgreementKey2019. Among these, EcdsaSecp256r1VerificationKey2019 is used for signature verification in end-to-end encryption scenarios (see [09-ANP E2EE Instant Messaging Protocol Specification](/09-anp-e2ee-instant-messaging-protocol-specification.md)).
 > 3. AgentDescription is a newly added service type to support the discovery of agent description documents.
+> 4. For scenarios requiring end-to-end encrypted communication, a key separation design is recommended: signing keys (ECDSA secp256r1 or secp256k1) and key agreement keys (X25519) should be managed separately. Signing keys should not participate in key agreement, and key agreement keys should not participate in signing. For detailed E2EE protocol design, see [09-ANP E2EE Instant Messaging Protocol Specification](/09-anp-e2ee-instant-messaging-protocol-specification.md).
 
 ### 2.5 DID Method Operations
 

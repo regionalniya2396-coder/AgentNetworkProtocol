@@ -4,9 +4,13 @@
 
 ## 摘要
 
-本规范定义了 ANP 端到端即时消息协议，这是一个基于 HTTP 和 JSON-RPC 2.0 的即时消息协议，支持私聊、群聊和端到端加密（E2EE）通信。协议使用 `did:wba` 作为身份标识，采用 DID WBA 认证机制进行身份验证。
+本规范定义了 ANP 端到端即时消息协议，这是一个基于 JSON-RPC 2.0 的即时消息协议，支持私聊、群聊和端到端加密（E2EE）通信。协议使用 `did:wba` 作为身份标识，采用 DID WBA 认证机制进行身份验证。
 
-本规范替代原有的 [04-基于DID的端到端加密通信技术协议](chinese/message/04-基于did的端到端加密通信技术协议.md) 和 [05-基于DID的消息服务协议](chinese/message/05-基于did的消息服务协议.md) 中基于 WebSocket 的方案，在保留 E2EE 核心加密逻辑的基础上，将传输层协议统一为 HTTP + JSON-RPC 2.0。
+本协议采用传输无关设计——JSON-RPC 2.0 定义消息格式和方法语义，可承载在 HTTP、WebSocket 或其他传输方式之上。本规范提供 HTTP 传输绑定作为默认参考实现。
+
+E2EE 方案基于 HPKE（Hybrid Public Key Encryption，RFC 9180），采用密钥分离设计——签名密钥（ECDSA secp256r1）与密钥协商密钥（X25519）各司其职。私聊 E2EE 通过 HPKE 一步初始化会话密钥，后续消息使用对称密钥 + 链式 ratchet 加密；群聊 E2EE 基于 Sender Keys + epoch 轮转机制，通过 HPKE 对每个群成员独立分发 Sender Key。
+
+本规范替代原有的 [04-基于DID的端到端加密通信技术协议](chinese/message/04-基于did的端到端加密通信技术协议.md) 和 [05-基于DID的消息服务协议](chinese/message/05-基于did的消息服务协议.md) 中的方案。
 
 ## 1. 背景
 
@@ -17,24 +21,35 @@ ANP 项目在早期阶段设计了两个消息相关的协议规范：
 - **04-基于DID的端到端加密通信技术协议**：定义了基于 WebSocket 的 E2EE 加密通信方案，包括 SourceHello、DestinationHello、Finished 握手消息以及基于 ECDHE 的短期密钥协商机制。
 - **05-基于DID的消息服务协议**：定义了基于 WebSocket 的消息路由和转发机制，包括 Message Proxy 连接、router 注册、心跳保活等。
 
-原有的实现过于复杂，现在实现一个简单的方案。
+原有方案存在以下问题：
+1. **握手流程复杂**：ECDHE 方案需要三步交互式握手（SourceHello → DestinationHello → Finished），增加了延迟和实现复杂度。
+2. **仅支持私聊 E2EE**：群聊场景下无法实现端到端加密。
+3. **密钥用途混淆**：使用同一组 secp256r1 密钥同时承担签名和密钥协商两种用途。
 
 ### 1.2 设计动机
 
-HTTP + JSON-RPC 2.0 方案具有以下优势：
+本规范在消息格式层和加密层两个维度进行升级：
 
-1. **简单可靠**：HTTP 是最广泛支持的应用层协议，任何编程语言和平台都有成熟的 HTTP 客户端库。
-2. **标准化**：JSON-RPC 2.0 是成熟的远程过程调用协议，定义了统一的请求/响应格式和错误码体系。
-3. **无状态**：HTTP 请求-响应模型天然无状态，不需要维护长连接，简化了服务端的实现。
-4. **易于扩展**：基于 HTTP 的方案更容易集成 RESTful 生态系统中的认证、限流、监控等基础设施。
-5. **防火墙友好**：HTTP/HTTPS 流量在绝大多数网络环境中畅通无阻。
+**消息格式层：JSON-RPC 2.0（传输无关）**
+
+1. **标准化**：JSON-RPC 2.0 是成熟的远程过程调用协议，定义了统一的请求/响应格式和错误码体系。
+2. **传输无关**：JSON-RPC 2.0 仅定义消息格式和方法语义，不依赖特定传输协议。可承载在 HTTP、WebSocket、TCP 或其他传输方式之上，适应不同场景的需求。
+3. **简单可靠**：JSON 格式在任何编程语言和平台都有成熟的支持库。
+4. **易于扩展**：新增消息类型或 API 方法只需扩展方法名和参数定义，无需修改传输层。
+
+**加密层：HPKE 替代 ECDHE**
+
+1. **标准化安全**：HPKE 是 RFC 9180 标准化方案，经过严格的安全性证明。
+2. **一步初始化**：HPKE 支持单向封装，将三步握手简化为一步 init，发起方无需等待对方回复即可开始加密通信。
+3. **密钥分离**：X25519 专注密钥协商（HPKE KEM），ECDSA secp256r1 专注签名，职责清晰。
+4. **群聊 E2EE**：HPKE 天然支持为多个接收方独立封装密钥，为群聊 Sender Key 分发提供基础。
 
 ### 1.3 与已有协议的关系
 
-本规范（09）替代原有的 04 和 05 协议：
+本规范替代原有的 04 和 05 协议：
 
-- **替代 04（E2EE 协议）**：E2EE 核心加密逻辑不变（ECDHE 密钥协商、AES-GCM 加密、签名验证），但将传输方式从 WebSocket 独立消息改为通过 JSON-RPC `send` 方法的 `content` 字段承载 E2EE 协议数据。
-- **替代 05（消息服务协议）**：消息发送和接收从 WebSocket 长连接改为 HTTP JSON-RPC 调用，去除了 Message Proxy、router 注册等机制。
+- **替代 04（E2EE 协议）**：E2EE 加密方案从 ECDHE 交互式握手升级为 HPKE 单向封装 + 链式 ratchet，新增群聊 E2EE 支持。
+- **替代 05（消息服务协议）**：消息收发协议从 WebSocket 长连接改为传输无关的 JSON-RPC 2.0 消息格式，去除了 Message Proxy、router 注册等机制。
 
 ## 2. 方案概述
 
@@ -44,7 +59,7 @@ HTTP + JSON-RPC 2.0 方案具有以下优势：
 
 ```plaintext
 +-------+          +----------------+          +----------------+          +-------+
-|       |  HTTP    |                |   HTTP   |                |  HTTP    |       |
+|       | HTTP/WS/ |                |          |                | HTTP/WS/ |       |
 | Agent | <------> | Message Server | <------> | Message Server | <------> | Agent |
 |  (A)  | JSON-RPC |     (A's)      |          |     (B's)      | JSON-RPC |  (B)  |
 +-------+          +----------------+          +----------------+          +-------+
@@ -52,24 +67,27 @@ HTTP + JSON-RPC 2.0 方案具有以下优势：
 
 - **Agent**：消息的发送者和接收者，通过 `did:wba` 进行身份标识。
 - **Message Server**：为 Agent 提供消息收发服务，包括消息存储、收件箱管理和群组管理。
-- Agent 与其所属的 Message Server 之间通过 HTTP JSON-RPC 2.0 协议通信。
+- Agent 与其所属的 Message Server 之间通过 JSON-RPC 2.0 协议通信，传输层可选用 HTTP、WebSocket 或其他方式。
 - Message Server 之间的通信协议不在本规范的范围内。
 
 ### 2.2 核心特性
 
 | 特性 | 说明 |
 |------|------|
-| **传输协议** | HTTP + JSON-RPC 2.0 |
+| **消息格式** | JSON-RPC 2.0 |
+| **传输协议** | 传输无关（支持 HTTP、WebSocket 等，详见第 4 节） |
 | **内容格式** | `application/json` |
 | **身份标识** | `did:wba` (Decentralized Identifier) |
-| **认证方式** | DID WBA 认证（详见 [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)） |
+| **认证方式** | DID WBA 认证（详见 [DID:WBA 方法设计规范](03-did-wba方法规范.md)） |
 | **消息类型** | 私聊、群聊 |
-| **E2EE 支持** | 基于 ECDHE 的端到端加密（仅私聊） |
+| **E2EE 支持** | 基于 HPKE 的端到端加密（私聊 + 群聊） |
+| **E2EE 密码栈** | DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / AES-128-GCM |
+| **签名算法** | ECDSA secp256r1 (P-256) |
 
 ### 2.3 设计原则
 
-1. **简单性**：使用成熟、广泛支持的标准协议（HTTP、JSON-RPC 2.0、JSON）。
-2. **安全性**：支持端到端加密，服务端透明转发加密消息，无法读取密文。
+1. **简单性**：使用成熟、广泛支持的标准协议（JSON-RPC 2.0、JSON、HPKE），传输层可灵活选择。
+2. **安全性**：支持端到端加密，密钥分离设计，服务端透明转发加密消息，无法读取密文。
 3. **开放性**：基于 DID 标准的身份标识，支持跨平台、跨域的消息互通。
 4. **实用性**：API 设计面向实际应用场景，包含完整的消息管理功能。
 
@@ -77,7 +95,7 @@ HTTP + JSON-RPC 2.0 方案具有以下优势：
 
 ### 3.1 DID 标识格式
 
-本协议使用 `did:wba` 方法进行身份标识（详见 [DID WBA 方法设计规范](03-did-wba-method-design-specification.md)）。
+本协议使用 `did:wba` 方法进行身份标识（详见 [DID WBA 方法设计规范](03-did-wba方法规范.md)）。
 
 **用户 DID 格式：**
 
@@ -99,13 +117,13 @@ did:wba:{domain}:group:{group_id}
 
 ### 3.2 认证方式
 
-本协议采用 ANP 统一的 DID WBA 认证机制进行身份验证。完整的认证流程和技术细节详见 [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)。
+本协议采用 ANP 统一的 DID WBA 认证机制进行身份验证。完整的认证流程和技术细节详见 [DID:WBA 方法设计规范](03-did-wba方法规范.md)。
 
-## 4. JSON-RPC 2.0 传输协议
+## 4. JSON-RPC 2.0 消息格式与传输绑定
 
 ### 4.1 请求/响应格式
 
-所有 API 采用 JSON-RPC 2.0 协议，通过 HTTP POST 方法调用。
+所有 API 采用 JSON-RPC 2.0 协议定义消息格式。JSON-RPC 2.0 本身是传输无关的，仅定义 JSON 消息的结构和方法语义。
 
 **请求格式：**
 
@@ -160,17 +178,41 @@ did:wba:{domain}:group:{group_id}
 | -32004 | 业务校验错误 | 业务规则校验未通过 |
 | -32005 | 限流 | 请求过于频繁，被服务端限流 |
 
-### 4.3 传输方式
+### 4.3 传输绑定
+
+本协议的 JSON-RPC 2.0 消息可承载在不同的传输方式之上。实现方**必须**至少支持一种传输绑定，**推荐**支持 HTTP 绑定。
+
+#### 4.3.1 HTTP 传输绑定（默认）
 
 - **协议**：HTTP/HTTPS POST
 - **内容类型**：`Content-Type: application/json`
 - **字符编码**：UTF-8
+- **端点**：JSON-RPC 请求发送到对应的服务端点路径（如 `/api/v1/messages/rpc`）
 
-所有接口均通过 HTTP POST 方法调用，请求体为 JSON-RPC 2.0 格式的 JSON 对象。
+所有接口通过 HTTP POST 方法调用，请求体为 JSON-RPC 2.0 格式的 JSON 对象，响应体为 JSON-RPC 2.0 格式的结果或错误。
+
+HTTP 绑定适用于大多数场景，尤其适合无状态、防火墙友好的环境。
+
+#### 4.3.2 WebSocket 传输绑定
+
+- **协议**：WebSocket (ws/wss)
+- **内容格式**：每条 WebSocket 消息为一个完整的 JSON-RPC 2.0 JSON 对象
+- **字符编码**：UTF-8
+- **连接管理**：客户端建立 WebSocket 连接后，可在同一连接上发送和接收多条 JSON-RPC 消息
+
+WebSocket 绑定适用于需要实时推送的场景（如消息即时通知），服务端可主动向客户端推送新消息，无需客户端轮询收件箱。
+
+#### 4.3.3 其他传输绑定
+
+JSON-RPC 2.0 消息亦可承载在 TCP、QUIC、消息队列等其他传输方式之上。实现方应确保：
+
+- 消息边界清晰（每条 JSON-RPC 消息可被完整解析）
+- 字符编码为 UTF-8
+- 传输层提供可靠传递保证（或在应用层处理重传）
 
 ## 5. 智能体描述协议集成
 
-本节描述如何在智能体描述（Agent Description, AD）文档中声明 E2EE 即时消息能力，使其他智能体能够自动发现并与 E2EE IM 服务进行交互。ANP E2EE IM 协议作为内置协议类型纳入智能体描述协议框架（完整的 AD 规范详见[智能体描述协议规范](chinese/07-ANP-智能体描述协议规范.md)）。
+本节描述如何在智能体描述（Agent Description, AD）文档中声明 E2EE 即时消息能力，使其他智能体能够自动发现并与 E2EE IM 服务进行交互。ANP E2EE IM 协议作为内置协议类型纳入智能体描述协议框架（完整的 AD 规范详见[智能体描述协议规范](07-ANP-智能体描述协议规范.md)）。
 
 ### 5.1 在 AD 文档中声明 E2EE IM 支持
 
@@ -203,10 +245,10 @@ did:wba:{domain}:group:{group_id}
           }
         ],
         "e2ee": {
-          "supported_versions": ["1.0"],
-          "cipher_suites": ["TLS_AES_128_GCM_SHA256"],
-          "supported_groups": ["secp256r1"],
-          "description": "E2EE 能力：ECDHE 密钥交换、AES-GCM 加密，仅支持私聊"
+          "hpke_suite": "DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM",
+          "signing_algorithm": "EcdsaSecp256r1Signature2019",
+          "features": ["private_chat_e2ee", "group_chat_e2ee"],
+          "description": "E2EE 能力：HPKE 密钥封装 + 链式 ratchet（私聊），Sender Keys + epoch 轮转（群聊）"
         }
       }
     }
@@ -237,9 +279,9 @@ did:wba:{domain}:group:{group_id}
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| supported_versions | array | 是 | 支持的 E2EE 协议版本列表 |
-| cipher_suites | array | 是 | 支持的加密套件列表（如 `["TLS_AES_128_GCM_SHA256"]`） |
-| supported_groups | array | 是 | 支持的椭圆曲线组列表（如 `["secp256r1"]`） |
+| hpke_suite | string | 是 | HPKE 密码套件标识 |
+| signing_algorithm | string | 是 | 签名算法（如 `"EcdsaSecp256r1Signature2019"`） |
+| features | array | 是 | 支持的 E2EE 特性列表（`"private_chat_e2ee"` / `"group_chat_e2ee"`） |
 | description | string | 否 | E2EE 能力的可读描述 |
 
 ## 6. 消息服务 API 定义
@@ -252,7 +294,7 @@ did:wba:{domain}:group:{group_id}
 
 #### 6.1.1 send — 发送消息
 
-发送消息（私聊或群聊），同时也是 E2EE 握手和加密消息的统一传输方法。
+发送消息（私聊或群聊），同时也是 E2EE 加密消息的统一传输方法。
 
 **认证：** optional（已认证用户会校验 sender 身份一致性）
 
@@ -275,15 +317,19 @@ did:wba:{domain}:group:{group_id}
 | `text` | 普通 | 文本消息 |
 | `image` | 普通 | 图片消息 |
 | `file` | 普通 | 文件消息 |
-| `e2ee_hello` | E2EE | 握手消息（SourceHello 或 DestinationHello） |
-| `e2ee_finished` | E2EE | 握手完成确认 |
-| `e2ee` | E2EE | 加密消息 |
+| `e2ee_init` | 私聊 E2EE | 会话初始化（HPKE 封装 session seed） |
+| `e2ee_msg` | 私聊 E2EE | 加密消息（对称 AEAD 密文） |
+| `e2ee_rekey` | 私聊 E2EE | 会话重置/换钥 |
 | `e2ee_error` | E2EE | E2EE 错误通知 |
+| `group_e2ee_key` | 群聊 E2EE | Sender Key 分发 |
+| `group_e2ee_msg` | 群聊 E2EE | 群密文消息 |
+| `group_epoch_advance` | 群聊 E2EE | 群纪元变化通知 |
 
 **E2EE 约束：**
-- E2EE 消息（type 为 `e2ee_hello`、`e2ee_finished`、`e2ee`、`e2ee_error`）**仅支持私聊**
-- 必须指定 `receiver_did`，不能指定 `group_did`
-- 违反此约束将返回 `-32602` 参数校验失败
+- 私聊 E2EE 消息（type 为 `e2ee_init`、`e2ee_msg`、`e2ee_rekey`、`e2ee_error`）必须指定 `receiver_did`，不能指定 `group_did`
+- 群聊 E2EE 消息（type 为 `group_e2ee_msg`、`group_epoch_advance`）必须指定 `group_did`，不能指定 `receiver_did`
+- `group_e2ee_key`（Sender Key 分发）需同时指定 `receiver_did`（接收该 Sender Key 的成员）和 `group_did`（所属群组），这是唯一同时指定两者的情况
+- 违反约束将返回 `-32602` 参数校验失败
 
 **请求示例（私聊）：**
 
@@ -798,158 +844,369 @@ E2EE 消息的请求示例详见第 8 节。
 | `image` | 图片消息 | 图片 URL 或 Base64 编码 |
 | `file` | 文件消息 | 文件 URL 或文件元数据 |
 
-### 7.2 E2EE 消息类型
+### 7.2 私聊 E2EE 消息类型
 
 所有 E2EE 消息通过 `send` 方法的 `content` 字段传输，content 内容为 JSON 序列化后的字符串。服务端**不解析**也**不修改** content 内容，直接透明转发。
 
 | type | 说明 | content 结构 |
 |------|------|-------------|
-| `e2ee_hello` | 握手消息 | SourceHello 或 DestinationHello（通过 `e2ee_type` 字段区分） |
-| `e2ee_finished` | 握手完成确认 | Finished（含 `session_id` 和 `verify_data`） |
-| `e2ee` | 加密消息 | 含 `secret_key_id`、`original_type`、`encrypted`（AES-GCM 密文） |
-| `e2ee_error` | E2EE 错误通知 | 含 `error_code` 和 `secret_key_id` |
+| `e2ee_init` | 会话初始化 | 含 HPKE 封装数据（`enc`、`encrypted_seed`）和签名 `proof` |
+| `e2ee_msg` | 加密消息 | 含 `session_id`、`seq`、`original_type` 和 AES-GCM 密文 |
+| `e2ee_rekey` | 会话重置/换钥 | 结构与 `e2ee_init` 相同，语义为重新建立会话密钥 |
+| `e2ee_error` | E2EE 错误通知 | 含 `error_code` 和 `session_id` |
 
-E2EE content 结构的详细定义见第 8.3 节。
+E2EE content 结构的详细定义见第 8.4 节。
+
+### 7.3 群聊 E2EE 消息类型
+
+群聊 E2EE 消息同样通过 `send` 方法的 `content` 字段传输，服务端透明转发。
+
+| type | 说明 | content 结构 |
+|------|------|-------------|
+| `group_e2ee_key` | Sender Key 分发 | 含 HPKE 封装的 Sender Key、`epoch`、`sender_key_id` 和签名 |
+| `group_e2ee_msg` | 群密文消息 | 含 `epoch`、`sender_key_id`、`seq`、AES-GCM 密文 |
+| `group_epoch_advance` | 群纪元变化通知 | 含 `new_epoch`、`reason`、成员变更列表和管理员签名 |
+
+群聊 E2EE content 结构的详细定义见第 8.6 节。
 
 ## 8. 端到端加密（E2EE）协议
 
 ### 8.1 概述
 
-本协议的端到端加密方案基于 ECDHE（Elliptic Curve Diffie-Hellman Ephemeral）密钥交换协议，支持两个 Agent 之间的加密通信。核心加密算法与 [04-基于DID的端到端加密通信技术协议](chinese/message/04-基于did的端到端加密通信技术协议.md) 一致。
+本协议的端到端加密方案基于 HPKE（Hybrid Public Key Encryption，RFC 9180），支持私聊和群聊两种场景的加密通信。
+
+**核心设计：**
+
+- **私聊 E2EE**：发起方使用接收方 DID 文档中的 X25519 `keyAgreement` 公钥，通过 HPKE 封装一个随机 session seed（一步完成，无需交互式握手）；后续消息使用从 seed 派生的对称会话密钥 + 链式 ratchet 加密。
+- **群聊 E2EE**：每个发送者生成 Sender Key，通过 HPKE 对每个群成员独立封装分发；群消息使用 Sender Key 的链式 ratchet 加密（一次加密，所有持有 Sender Key 的成员均可解密）。成员变更时递增 epoch，触发新一轮 Sender Key 分发。
 
 **关键特性：**
 
-- **仅支持私聊**：E2EE 消息不支持群聊场景
 - **服务端透明转发**：所有 E2EE 数据嵌入 `send` 方法的 `content` 字段，服务端不解析或修改加密数据
-- **统一传输**：E2EE 握手消息和加密消息都通过 `send` 方法的 `type` 字段区分类型
+- **统一传输**：所有 E2EE 消息都通过 `send` 方法的 `type` 字段区分类型
+- **一步初始化**：私聊会话建立只需一条 `e2ee_init` 消息，无需交互式握手
 
-### 8.2 E2EE 握手流程
+### 8.2 密码学基础
 
-E2EE 握手通过 `send` 方法交换握手消息，完成密钥协商后进入加密通信阶段。
+#### 8.2.1 密钥分离
+
+本协议严格分离签名密钥和密钥协商密钥：
+
+| 用途 | 算法 | DID 文档字段 | 说明 |
+|------|------|-------------|------|
+| 签名 / 身份验证 | ECDSA secp256r1 | `authentication` / `assertionMethod` | 用于 proof 签名、DID WBA 认证 |
+| 密钥协商 | X25519 | `keyAgreement` | 用于 HPKE KEM 封装/解封装 |
+
+签名密钥不参与密钥协商，密钥协商密钥不参与签名。这种分离设计确保单一密钥的泄露不会同时影响身份认证和通信机密性。
+
+#### 8.2.2 HPKE 密码栈
+
+本协议使用以下固定的 HPKE 密码栈：
+
+| 组件 | 选择 | RFC 9180 标识 |
+|------|------|--------------|
+| KEM | DHKEM(X25519, HKDF-SHA256) | 0x0020 |
+| KDF | HKDF-SHA256 | 0x0001 |
+| AEAD | AES-128-GCM | 0x0001 |
+
+完整套件标识字符串：`DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM`
+
+HPKE 操作模式：**Base 模式**（即 `mode_base`，不绑定发送方身份到 HPKE 层，发送方身份通过 proof 签名保证）。
+
+#### 8.2.3 DID 文档中的 keyAgreement 引用
+
+HPKE 封装时所需的接收方 X25519 公钥，从接收方 DID 文档的 `keyAgreement` 字段获取。DID:WBA 规范已定义该字段为可选字段，类型 `X25519KeyAgreementKey2019`，公钥格式 `publicKeyMultibase`。
+
+**公钥获取步骤：**
+
+1. 解析接收方 DID，获取 DID 文档
+2. 从 `keyAgreement` 数组中取出 `X25519KeyAgreementKey2019` 类型条目
+3. 解码 `publicKeyMultibase` 字段得到 X25519 公钥原始字节（32 字节）
+
+**DID 文档相关片段示例：**
+
+```json
+{
+  "id": "did:wba:example.com:user:alice",
+  "verificationMethod": [
+    {
+      "id": "did:wba:example.com:user:alice#keys-1",
+      "type": "EcdsaSecp256r1VerificationKey2019",
+      "controller": "did:wba:example.com:user:alice",
+      "publicKeyJwk": {
+        "crv": "P-256",
+        "kty": "EC",
+        "x": "...",
+        "y": "..."
+      }
+    },
+    {
+      "id": "did:wba:example.com:user:alice#key-x25519-1",
+      "type": "X25519KeyAgreementKey2019",
+      "controller": "did:wba:example.com:user:alice",
+      "publicKeyMultibase": "z9hFgmPVfmBZwRvFEyniQDBkz9LmV7gDEqytWyGZLmDXE"
+    }
+  ],
+  "authentication": [
+    "did:wba:example.com:user:alice#keys-1"
+  ],
+  "keyAgreement": [
+    "did:wba:example.com:user:alice#key-x25519-1"
+  ]
+}
+```
+
+如果对方 DID 文档中没有 `keyAgreement` 字段或没有 `X25519KeyAgreementKey2019` 类型条目，则表示该智能体不支持 E2EE。
+
+### 8.3 私聊 E2EE 协议
+
+#### 8.3.1 会话模型
+
+每个私聊 E2EE 会话维护以下状态：
+
+| 状态变量 | 类型 | 说明 |
+|----------|------|------|
+| session_id | string | 会话标识，32 个随机 hex 字符 |
+| root_seed | bytes(32) | 来自 HPKE 解密的 session seed |
+| send_chain_key | bytes(32) | 发送方向的链密钥 |
+| recv_chain_key | bytes(32) | 接收方向的链密钥 |
+| send_seq | uint64 | 发送序号，从 0 开始递增 |
+| recv_seq | uint64 | 接收序号，从 0 开始递增 |
+| expires_at | datetime | 会话过期时间 |
+
+**方向确定规则：** 比较发送方和接收方的 DID 字符串（UTF-8 字节序），字典序较小的一方为 `initiator`。`initiator` 使用 label `"anp-e2ee-init"` 派生 send_chain_key、`"anp-e2ee-resp"` 派生 recv_chain_key；另一方反之。这样保证双方对于 send/recv 密钥链的分配完全一致，无论由谁发起 `e2ee_init`。
+
+#### 8.3.2 会话初始化流程
 
 ```plaintext
 Alice                           Message Server                          Bob
   |                                   |                                   |
-  |  send(type=e2ee_hello)            |                                   |
-  |  content=SourceHello              |                                   |
-  |---------------------------------->|  send(type=e2ee_hello)            |
-  |                                   |  content=SourceHello              |
+  |  [1. 获取 Bob DID 文档]            |                                   |
+  |  [2. 取 keyAgreement X25519 公钥]  |                                   |
+  |  [3. 生成 root_seed (32 bytes)]    |                                   |
+  |  [4. HPKE.Seal(bob_pk,            |                                   |
+  |       root_seed) -> (enc, ct)]     |                                   |
+  |  [5. 签名 proof]                   |                                   |
+  |                                   |                                   |
+  |  send(type=e2ee_init)             |                                   |
+  |  content={session_id, enc, ct,    |                                   |
+  |           proof, ...}             |                                   |
+  |---------------------------------->|  send(type=e2ee_init)             |
   |                                   |---------------------------------->|
   |                                   |                                   |
-  |                                   |  send(type=e2ee_hello)            |
-  |                                   |  content=DestinationHello         |
-  |  send(type=e2ee_hello)            |<----------------------------------|
-  |  content=DestinationHello         |                                   |
-  |<----------------------------------|  send(type=e2ee_finished)         |
-  |                                   |  content=Finished                 |
-  |  send(type=e2ee_finished)         |<----------------------------------|
-  |  content=Finished                 |                                   |
-  |<----------------------------------|                                   |
+  |                                   |  [6. HPKE.Open(enc, ct)           |
+  |                                   |       -> root_seed]               |
+  |                                   |  [7. 验证 proof 签名]             |
+  |                                   |  [8. 派生 send/recv chain keys]   |
   |                                   |                                   |
-  |  send(type=e2ee_finished)         |                                   |
-  |  content=Finished                 |                                   |
-  |---------------------------------->|  send(type=e2ee_finished)         |
-  |                                   |  content=Finished                 |
-  |                                   |---------------------------------->|
+  |  [Alice 也派生 send/recv chain keys，会话即刻激活]                       |
   |                                   |                                   |
-  |           [双方会话激活，开始加密通信]                                    |
-  |                                   |                                   |
-  |  send(type=e2ee)                  |                                   |
+  |  send(type=e2ee_msg, seq=0)       |                                   |
   |  content=加密消息                  |                                   |
-  |---------------------------------->|  send(type=e2ee)                  |
-  |                                   |  content=加密消息                  |
+  |---------------------------------->|  send(type=e2ee_msg)              |
   |                                   |---------------------------------->|
   |                                   |                                   |
 ```
 
-**握手流程说明：**
+**流程说明：**
 
-1. **Alice 发送 SourceHello**：Alice 发起 E2EE 握手，通过 `send` 方法发送 `type=e2ee_hello` 消息，content 中携带 SourceHello 数据（包含公钥、支持的加密参数、签名等）。
-2. **Bob 回复 DestinationHello + Finished**：Bob 收到 SourceHello 后，选择加密参数，通过 `send` 方法回复 DestinationHello（`type=e2ee_hello`）和 Finished（`type=e2ee_finished`）两条消息。
-3. **Alice 回复 Finished**：Alice 收到 DestinationHello 后计算共享密钥，发送 Finished 消息。
-4. **双方会话激活**：Bob 处理 Alice 的 Finished 消息后，双方密钥协商完成，会话激活。
-5. **加密通信**：双方使用 `type=e2ee` 类型的消息互发加密内容。
+1. Alice 解析 Bob 的 DID 文档，从 `keyAgreement` 中获取 Bob 的 X25519 公钥。
+2. Alice 生成 32 字节随机 `root_seed`（**必须**使用密码学安全随机数生成器 CSPRNG 生成）和 `session_id`。
+3. Alice 使用 HPKE Base 模式的 `Seal` 操作封装 `root_seed`：
+   - 接收方公钥：Bob 的 X25519 公钥
+   - 明文：`root_seed`（32 字节）
+   - AAD：`session_id` 的 UTF-8 编码
+   - 输出：`enc`（32 字节 X25519 临时公钥，Base64 编码）和 `encrypted_seed`（AEAD 密文，Base64 编码）
+4. Alice 对整个 content 做 proof 签名（使用自己 DID 文档 `authentication` 中的签名密钥）。
+5. Alice 通过 `send` 方法发送 `type=e2ee_init` 消息。Alice 发送后即可直接发送 `e2ee_msg` 加密消息，无需等待 Bob 回复。
+6. Bob 收到后，使用自己的 X25519 私钥和 `enc` 执行 HPKE `Open`，恢复 `root_seed`。
+7. Bob 从 Alice 的 DID 文档获取签名公钥，验证 proof 签名。
+8. 双方各自从 `root_seed` 派生 send/recv chain key（参见 8.3.3），会话激活。
 
-### 8.3 E2EE content 结构定义
+**消息送达顺序要求：**
+
+Message Server **必须**保证同一发送方到同一接收方的消息按发送顺序送达（FIFO 顺序）。具体而言：
+- `e2ee_init` 消息**必须**在后续 `e2ee_msg` 消息之前送达接收方。如果接收方先收到 `e2ee_msg` 而找不到对应 `session_id` 的会话状态，**应**缓存该消息并等待 `e2ee_init` 到达，或返回 `e2ee_error`（error_code: `session_not_found`）。
+- `e2ee_rekey` 与后续 `e2ee_msg` 同理，`e2ee_rekey` **必须**在使用新 session_id 的 `e2ee_msg` 之前送达。
+- 对于群聊，`group_e2ee_key` **必须**在同一发送方的 `group_e2ee_msg` 之前送达给对应接收方。
+
+#### 8.3.3 链式 ratchet 密钥派生
+
+**初始派生（从 root_seed 生成方向链密钥）：**
+
+`root_seed` 由发送方使用密码学安全随机数生成器（CSPRNG）生成的 32 字节随机数，通过 HPKE 加密传输。由于 `root_seed` 本身已具有充分的熵（256 bit 随机），可直接作为 HKDF-Expand 的 PRK（Pseudo-Random Key）输入，无需再经过 HKDF-Extract 步骤。
+
+```python
+from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
+from cryptography.hazmat.primitives import hashes
+
+def derive_chain_keys(root_seed: bytes) -> tuple[bytes, bytes]:
+    """从 root_seed 派生两个方向的初始链密钥"""
+    init_chain_key = HKDFExpand(
+        algorithm=hashes.SHA256(),
+        length=32,
+        info=b"anp-e2ee-init"
+    ).derive(root_seed)
+
+    resp_chain_key = HKDFExpand(
+        algorithm=hashes.SHA256(),
+        length=32,
+        info=b"anp-e2ee-resp"
+    ).derive(root_seed)
+
+    return init_chain_key, resp_chain_key
+```
+
+**方向分配：**
+- DID 字典序较小方（initiator）：`send_chain_key = init_chain_key`，`recv_chain_key = resp_chain_key`
+- DID 字典序较大方（responder）：`send_chain_key = resp_chain_key`，`recv_chain_key = init_chain_key`
+
+**每条消息的密钥派生：**
+
+```python
+import hmac
+import hashlib
+
+def derive_message_key(chain_key: bytes, seq: int) -> tuple[bytes, bytes, bytes]:
+    """派生消息密钥，返回 (enc_key, nonce, new_chain_key)"""
+    seq_bytes = seq.to_bytes(8, 'big')
+
+    # 派生消息密钥
+    msg_key = hmac.new(chain_key, b"msg" + seq_bytes, hashlib.sha256).digest()
+    # 更新链密钥
+    new_chain_key = hmac.new(chain_key, b"ck", hashlib.sha256).digest()
+
+    # 从 msg_key 派生 AES 加密密钥和 nonce
+    enc_key = hmac.new(msg_key, b"key", hashlib.sha256).digest()[:16]  # AES-128
+    nonce = hmac.new(msg_key, b"nonce", hashlib.sha256).digest()[:12]  # GCM nonce
+
+    return enc_key, nonce, new_chain_key
+```
+
+每条消息使用独立的 `enc_key` 和 `nonce`，用后丢弃。链密钥在每条消息后更新为新值（单向更新，无法从新 chain_key 反推旧 chain_key，实现消息级前向安全）。
+
+#### 8.3.4 消息加密/解密
+
+**加密流程：**
+
+1. 调用 `derive_message_key(send_chain_key, send_seq)` 获取 `enc_key`、`nonce`、`new_chain_key`
+2. 使用 AES-128-GCM 加密明文，AAD = `session_id` 的 UTF-8 编码
+3. 将密文和 GCM tag 拼接后 Base64 编码，写入 `ciphertext` 字段
+4. 更新 `send_chain_key = new_chain_key`，`send_seq += 1`
+
+**解密流程：**
+
+1. 验证消息中的 `seq` 是否在可接受范围内（见下方乱序容忍说明）
+2. 调用 `derive_message_key(recv_chain_key, recv_seq)` 获取 `enc_key`、`nonce`、`new_chain_key`
+3. Base64 解码 `ciphertext`，分离密文和 GCM tag，使用 AES-128-GCM 解密
+4. 更新 `recv_chain_key = new_chain_key`，`recv_seq += 1`
+
+**序号与乱序容忍：**
+
+本规范定义两种 seq 验证策略，实现方**必须**至少支持其一：
+
+- **严格模式（默认）**：要求 `seq == recv_seq`（严格递增），拒绝任何乱序消息。此模式依赖 Message Server 保证同一方向的 FIFO 送达顺序（参见 8.3.2 消息送达顺序要求）。
+- **窗口模式（推荐）**：允许 `recv_seq <= seq < recv_seq + MAX_SKIP`（建议 `MAX_SKIP = 256`）。若 `seq > recv_seq`，接收方需要对 `recv_seq` 到 `seq - 1` 的中间链密钥执行"快进"（连续调用 `derive_message_key` 推进 chain_key 到目标位置），并**应**将跳过的 msg_key 缓存以便后续乱序消息到达时解密。缓存的 msg_key **应**设定有效期（建议不超过 300 秒），过期后销毁。
+
+无论采用哪种模式，已使用过的 `seq` **必须**拒绝重复解密（防重放）。
+
+**AES-128-GCM 加密示例：**
+
+```python
+import os
+import base64
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+def encrypt_message(plaintext: bytes, enc_key: bytes, nonce: bytes,
+                    session_id: str) -> str:
+    """AES-128-GCM 加密，返回 Base64 编码的 ciphertext（含 tag）"""
+    aad = session_id.encode('utf-8')
+    aesgcm = AESGCM(enc_key)
+    ct_with_tag = aesgcm.encrypt(nonce, plaintext, aad)
+    return base64.b64encode(ct_with_tag).decode('utf-8')
+
+def decrypt_message(ciphertext_b64: str, enc_key: bytes, nonce: bytes,
+                    session_id: str) -> bytes:
+    """AES-128-GCM 解密"""
+    aad = session_id.encode('utf-8')
+    ct_with_tag = base64.b64decode(ciphertext_b64)
+    aesgcm = AESGCM(enc_key)
+    return aesgcm.decrypt(nonce, ct_with_tag, aad)
+```
+
+#### 8.3.5 会话重建（rekey）
+
+当出现以下情况时，任一方可发送 `e2ee_rekey` 消息重建会话密钥：
+
+- 会话密钥过期（超过 `expires_at`）
+- 安全事件（怀疑密钥泄露）
+- 设备更换或状态丢失
+- 主动密钥轮换
+
+`e2ee_rekey` 的结构与 `e2ee_init` 完全相同。收到 `e2ee_rekey` 后：
+
+1. 执行与 `e2ee_init` 相同的 HPKE 解封装和密钥派生
+2. 使用新的 `session_id` 和 `root_seed`
+3. 重置 `send_seq` 和 `recv_seq` 为 0
+4. 旧会话状态销毁
+
+#### 8.3.6 错误处理
+
+当 E2EE 通信发生异常时，通过 `e2ee_error` 类型消息通知对方。
+
+| error_code | 说明 | 建议操作 |
+|------------|------|----------|
+| `session_not_found` | 会话不存在或已销毁 | 发起方重新发送 `e2ee_init` |
+| `session_expired` | 会话已过期 | 发起方发送 `e2ee_rekey` |
+| `decryption_failed` | 解密失败（密钥不同步等） | 发起方发送 `e2ee_rekey` |
+| `invalid_seq` | 序号不匹配 | 发起方发送 `e2ee_rekey` |
+| `unsupported_suite` | 不支持的 HPKE 密码套件 | 检查对方 AD 文档中的能力声明 |
+| `no_key_agreement` | 对方 DID 文档无 keyAgreement | 退回明文通信或放弃 |
+
+### 8.4 私聊 E2EE content 结构定义
 
 所有 E2EE 数据都通过 `send` 方法的 `content` 字段传输（JSON 序列化字符串）。
 
-#### 8.3.1 SourceHello（e2ee_type=source_hello）
+#### 8.4.1 e2ee_init — 会话初始化
 
-由 E2EE 会话发起方发送，包含身份信息、公钥和支持的加密参数。
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| session_id | string | 是 | 会话 ID，32 个随机 hex 字符 |
+| hpke_suite | string | 是 | HPKE 密码套件标识 |
+| sender_did | string | 是 | 发送方 DID |
+| recipient_did | string | 是 | 接收方 DID |
+| recipient_key_id | string | 是 | 接收方 DID 文档中 keyAgreement 的 id |
+| enc | string | 是 | HPKE 封装密文（Base64 编码，32 字节 X25519 临时公钥） |
+| encrypted_seed | string | 是 | HPKE AEAD 加密的 root_seed（Base64 编码，含 GCM tag） |
+| expires | integer | 否 | 会话有效期（秒），默认 86400 |
+| proof | object | 是 | 发送方签名 |
 
-**字段定义：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| e2ee_type | string | 固定为 `"source_hello"` |
-| version | string | 协议版本号 |
-| session_id | string | 会话 ID，16 位随机字符串 |
-| source_did | string | 发送者 DID |
-| destination_did | string | 接收者 DID |
-| random | string | 32 位随机字符串，确保握手唯一性，参与密钥交换 |
-| supported_versions | array | 支持的协议版本列表 |
-| cipher_suites | array | 支持的加密套件列表 |
-| supported_groups | array | 支持的椭圆曲线组 |
-| key_shares | array | 密钥交换公钥信息列表 |
-| verification_method | object | 发送者 DID 对应的公钥 |
-| proof | object | 消息签名 |
-
-**key_shares 元素结构：**
+**proof 结构（适用于所有需要签名的 E2EE 消息）：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| group | string | 椭圆曲线组（如 `secp256r1`） |
-| expires | number | 密钥有效期（秒） |
-| key_exchange | string | 用于密钥交换的公钥（十六进制） |
-
-**verification_method 结构：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | string | 验证方法 ID |
-| type | string | 公钥类型（如 `EcdsaSecp256r1VerificationKey2019`） |
-| public_key_hex | string | 公钥十六进制表示 |
-
-**proof 结构：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| type | string | 签名类型（如 `EcdsaSecp256r1Signature2019`） |
+| type | string | 签名类型（`"EcdsaSecp256r1Signature2019"`） |
 | created | string | 签名创建时间（ISO 8601 UTC） |
-| verification_method | string | 签名使用的验证方法 ID |
+| verification_method | string | 签名使用的验证方法 ID（DID 文档 `authentication` 中的条目） |
 | proof_value | string | 签名值（Base64URL 编码） |
 
 **content 示例（JSON 序列化前）：**
 
 ```json
 {
-  "e2ee_type": "source_hello",
-  "version": "1.0",
-  "session_id": "abc123session",
-  "source_did": "did:wba:example.com:user:alice",
-  "destination_did": "did:wba:example.com:user:bob",
-  "random": "b7e4b4d5f6c4e4f7a6b4c8d2e48f37a6c6c6f6d7b7a6e4b4d5f6c4e4f7a6b4c8d2e48f37a6c6c6f6d7b7a6e4b4d5f6c4e4f7a6",
-  "supported_versions": ["1.0"],
-  "cipher_suites": ["TLS_AES_128_GCM_SHA256"],
-  "supported_groups": ["secp256r1"],
-  "key_shares": [
-    {
-      "group": "secp256r1",
-      "expires": 86400,
-      "key_exchange": "04a34b..."
-    }
-  ],
-  "verification_method": {
-    "id": "did:wba:example.com:user:alice#keys-1",
-    "type": "EcdsaSecp256r1VerificationKey2019",
-    "public_key_hex": "04a34b..."
-  },
+  "session_id": "a1b2c3d4e5f60718a1b2c3d4e5f60718",
+  "hpke_suite": "DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM",
+  "sender_did": "did:wba:example.com:user:alice",
+  "recipient_did": "did:wba:example.com:user:bob",
+  "recipient_key_id": "did:wba:example.com:user:bob#key-x25519-1",
+  "enc": "dGhpcyBpcyBhIDMyLWJ5dGUgZXBoZW1lcmFsIHB1YmxpYyBrZXk=",
+  "encrypted_seed": "ZW5jcnlwdGVkIHNlZWQgZGF0YSB3aXRoIEdDTSB0YWc=",
+  "expires": 86400,
   "proof": {
     "type": "EcdsaSecp256r1Signature2019",
-    "created": "2024-05-27T10:51:55Z",
+    "created": "2026-03-01T10:30:00Z",
     "verification_method": "did:wba:example.com:user:alice#keys-1",
-    "proof_value": "eyJhbGci..."
+    "proof_value": "MEUCIQDx..."
   }
 }
 ```
@@ -963,128 +1220,254 @@ Alice                           Message Server                          Bob
   "params": {
     "sender_did": "did:wba:example.com:user:alice",
     "receiver_did": "did:wba:example.com:user:bob",
-    "content": "{\"e2ee_type\":\"source_hello\",\"version\":\"1.0\",\"session_id\":\"abc123\",\"source_did\":\"did:wba:example.com:user:alice\",\"destination_did\":\"did:wba:example.com:user:bob\",\"random\":\"...\",\"supported_versions\":[\"1.0\"],\"cipher_suites\":[\"TLS_AES_128_GCM_SHA256\"],\"supported_groups\":[\"secp256r1\"],\"key_shares\":[{\"group\":\"secp256r1\",\"expires\":86400,\"key_exchange\":\"...\"}],\"verification_method\":{\"id\":\"...\",\"type\":\"EcdsaSecp256r1VerificationKey2019\",\"public_key_hex\":\"...\"},\"proof\":{\"type\":\"EcdsaSecp256r1Signature2019\",\"created\":\"...\",\"verification_method\":\"...\",\"proof_value\":\"...\"}}",
-    "type": "e2ee_hello"
+    "content": "{\"session_id\":\"a1b2c3d4e5f60718a1b2c3d4e5f60718\",\"hpke_suite\":\"DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM\",\"sender_did\":\"did:wba:example.com:user:alice\",\"recipient_did\":\"did:wba:example.com:user:bob\",\"recipient_key_id\":\"did:wba:example.com:user:bob#key-x25519-1\",\"enc\":\"...\",\"encrypted_seed\":\"...\",\"expires\":86400,\"proof\":{\"type\":\"EcdsaSecp256r1Signature2019\",\"created\":\"2026-03-01T10:30:00Z\",\"verification_method\":\"did:wba:example.com:user:alice#keys-1\",\"proof_value\":\"...\"}}",
+    "type": "e2ee_init"
   },
   "id": 1
 }
 ```
 
-#### 8.3.2 DestinationHello（e2ee_type=destination_hello）
+#### 8.4.2 e2ee_msg — 加密消息
 
-由 E2EE 会话接收方回复，包含选定的加密参数。
+`e2ee_msg` 不包含 `proof` 签名字段。原因：`e2ee_msg` 的认证性由会话密钥本身保证——只有持有正确 `session_id` 对应的 chain_key 的一方才能生成有效密文（AES-128-GCM 提供认证加密），而 chain_key 来自 `e2ee_init` 中经 proof 签名认证的 root_seed。因此，成功解密本身即可验证发送方身份。此外，省略逐条消息签名避免了 ECDSA 签名的计算开销。
 
-**字段定义：**
+**信任前提**：接收方在处理 `e2ee_msg` 时，**必须**验证 `send` 方法中的 `sender_did` 与该 `session_id` 所绑定的会话对端 DID 一致。若不匹配，**必须**拒绝处理该消息。这确保即使 Message Server 篡改了外层 `sender_did` 字段，也不会导致消息被错误归属到其他会话。
 
-与 SourceHello 类似，区别在于：
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| session_id | string | 是 | 会话 ID |
+| seq | integer | 是 | 消息序号（从 0 开始，严格递增） |
+| original_type | string | 是 | 原始消息类型（`text` / `image` / `file`） |
+| ciphertext | string | 是 | AES-128-GCM 密文 + tag（Base64 编码） |
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| e2ee_type | string | 固定为 `"destination_hello"` |
-| version | string | 协议版本号 |
-| session_id | string | 使用 SourceHello 中的 session_id |
-| source_did | string | 发送者 DID（DestinationHello 的发送者） |
-| destination_did | string | 接收者 DID（SourceHello 的发送者） |
-| random | string | 32 位随机字符串 |
-| selected_version | string | 选定的协议版本（单数） |
-| cipher_suite | string | 选定的加密套件（单数） |
-| key_share | object | 选定的密钥交换信息（单数） |
-| verification_method | object | 发送者 DID 对应的公钥 |
-| proof | object | 消息签名 |
-
-**content 示例（JSON 序列化前）：**
+**content 示例：**
 
 ```json
 {
-  "e2ee_type": "destination_hello",
-  "version": "1.0",
-  "session_id": "abc123session",
-  "source_did": "did:wba:example.com:user:bob",
-  "destination_did": "did:wba:example.com:user:alice",
-  "random": "e4b4d5f6c4e4f7a6b4c8d2e48f37a6c6c6f6d7b7a6e4b4d5f6c4e4f7a6b4c8d2e48f37a6c6c6f6d7b7a6e4b4d5f6c4e4f7a6",
-  "selected_version": "1.0",
-  "cipher_suite": "TLS_AES_128_GCM_SHA256",
-  "key_share": {
-    "group": "secp256r1",
-    "expires": 86400,
-    "key_exchange": "04b56c..."
+  "session_id": "a1b2c3d4e5f60718a1b2c3d4e5f60718",
+  "seq": 0,
+  "original_type": "text",
+  "ciphertext": "ZW5jcnlwdGVkIG1lc3NhZ2UgY29udGVudA=="
+}
+```
+
+**send 请求示例：**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "send",
+  "params": {
+    "sender_did": "did:wba:example.com:user:alice",
+    "receiver_did": "did:wba:example.com:user:bob",
+    "content": "{\"session_id\":\"a1b2c3d4e5f60718a1b2c3d4e5f60718\",\"seq\":0,\"original_type\":\"text\",\"ciphertext\":\"ZW5jcnlwdGVkIG1lc3NhZ2UgY29udGVudA==\"}",
+    "type": "e2ee_msg"
   },
-  "verification_method": {
-    "id": "did:wba:example.com:user:bob#keys-1",
-    "type": "EcdsaSecp256r1VerificationKey2019",
-    "public_key_hex": "04b56c..."
-  },
+  "id": 1
+}
+```
+
+**说明：** nonce 从链式 ratchet 确定性派生（而非随机生成），GCM tag 附在密文末尾，因此 `ciphertext` 单个字段即可承载完整的 AEAD 输出，无需单独的 `iv` 和 `tag` 字段。
+
+#### 8.4.3 e2ee_rekey — 会话重建
+
+结构与 `e2ee_init` 完全相同，所有字段定义参见 8.4.1。
+
+语义区别：`e2ee_rekey` 表示重建已有的会话密钥，接收方应销毁旧会话状态，使用新的 `session_id` 和 `root_seed` 建立新会话。
+
+#### 8.4.4 e2ee_error — 错误通知
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| error_code | string | 是 | 错误码（见 8.3.6 错误码表） |
+| session_id | string | 否 | 关联的会话 ID |
+| message | string | 否 | 可读错误描述 |
+
+**content 示例：**
+
+```json
+{
+  "error_code": "session_not_found",
+  "session_id": "a1b2c3d4e5f60718a1b2c3d4e5f60718",
+  "message": "E2EE session not found, please re-initialize"
+}
+```
+
+### 8.5 群聊 E2EE 协议
+
+#### 8.5.1 概述与核心概念
+
+群聊 E2EE 采用 **Sender Keys** 方案：每个群成员作为发送者时，持有自己的对称 Sender Key，并将其通过 HPKE 分发给所有其他群成员。群消息使用发送者的 Sender Key 链式 ratchet 加密，所有持有该 Sender Key 的成员均可解密。
+
+核心概念：
+
+| 概念 | 类型 | 说明 |
+|------|------|------|
+| **epoch** | integer | 群纪元，非负整数，从 0 开始，成员变更时递增 |
+| **sender_key_id** | string | Sender Key 标识，格式建议 `{sender_did_short_hash}:{epoch}` |
+| **sender_chain_key** | bytes(32) | 32 字节随机对称密钥，用于链式 ratchet 派生每条群消息的加密密钥 |
+| **sender_seq** | uint64 | 发送者在当前 epoch 内的消息序号 |
+
+#### 8.5.2 Sender Key 模型
+
+每个群成员在每个 epoch 生成一个 `sender_chain_key`（32 字节随机数）。该密钥的链式 ratchet 与私聊类似，但使用不同的 label 前缀以区分：
+
+```python
+def derive_group_message_key(sender_chain_key: bytes, seq: int) -> tuple[bytes, bytes, bytes]:
+    """派生群消息密钥"""
+    seq_bytes = seq.to_bytes(8, 'big')
+
+    msg_key = hmac.new(sender_chain_key, b"gmsg" + seq_bytes, hashlib.sha256).digest()
+    new_chain_key = hmac.new(sender_chain_key, b"gck", hashlib.sha256).digest()
+
+    enc_key = hmac.new(msg_key, b"key", hashlib.sha256).digest()[:16]
+    nonce = hmac.new(msg_key, b"nonce", hashlib.sha256).digest()[:12]
+
+    return enc_key, nonce, new_chain_key
+```
+
+#### 8.5.3 Sender Key 分发流程
+
+当成员首次在某个 epoch 发言（或 epoch 轮转后），需要先将 Sender Key 分发给所有其他群成员：
+
+```plaintext
+Alice (sender)                  Message Server           Bob (member), Carol (member)
+  |                                   |                              |
+  |  [生成 sender_chain_key]           |                              |
+  |                                   |                              |
+  |  [获取 Bob 的 X25519 公钥]         |                              |
+  |  [HPKE.Seal(bob_pk,               |                              |
+  |   sender_chain_key)]              |                              |
+  |                                   |                              |
+  |  send(type=group_e2ee_key,        |                              |
+  |   receiver_did=bob,               |                              |
+  |   group_did=group_dev)            |                              |
+  |---------------------------------->|  转发给 Bob                   |
+  |                                   |----------------------------->|
+  |                                   |                              |
+  |  [获取 Carol 的 X25519 公钥]       |                              |
+  |  [HPKE.Seal(carol_pk,             |                              |
+  |   sender_chain_key)]              |                              |
+  |                                   |                              |
+  |  send(type=group_e2ee_key,        |                              |
+  |   receiver_did=carol,             |                              |
+  |   group_did=group_dev)            |                              |
+  |---------------------------------->|  转发给 Carol                 |
+  |                                   |----------------------------->|
+  |                                   |                              |
+  |  [分发完成后开始发送群密文消息]       |                              |
+  |                                   |                              |
+  |  send(type=group_e2ee_msg,        |                              |
+  |   group_did=group_dev)            |                              |
+  |---------------------------------->|  转发给所有群成员              |
+  |                                   |----------------------------->|
+```
+
+发送者对群内**每个其他成员**分别执行 HPKE 封装，通过 `send(type=group_e2ee_key)` 发送独立的分发消息。每条消息的 `enc` 和 `encrypted_sender_key` 因接收者不同而不同。
+
+**Sender Key 重放拒绝：** 接收方**必须**拒绝已存在的 `(sender_did, epoch, sender_key_id)` 组合的 `group_e2ee_key` 消息。若收到重复的组合，**必须**丢弃该消息，不得覆盖已有的 Sender Key 状态。这防止攻击者通过重放旧的 `group_e2ee_key` 消息将接收方的 Sender Key 状态回滚到已知值。
+
+#### 8.5.4 群消息加密/解密
+
+**加密（发送者）：**
+
+1. 使用自己当前 epoch 的 `sender_chain_key`
+2. `derive_group_message_key(sender_chain_key, sender_seq)` 得到 `enc_key`、`nonce`、`new_chain_key`
+3. AES-128-GCM 加密，AAD = `group_did + ":" + str(epoch)` 的 UTF-8 编码
+4. 更新 `sender_chain_key = new_chain_key`，`sender_seq += 1`
+5. 通过 `send(type=group_e2ee_msg, group_did=...)` 发送，服务端转发给所有群成员
+
+**解密（接收者）：**
+
+1. 根据消息中的 `sender_did` + `epoch` + `sender_key_id` 查找本地存储的对应 `sender_chain_key`
+2. 验证 `seq` 是否在可接受范围内（见下方群聊序号规则）
+3. 派生密钥，解密
+4. 更新对应 sender 的 `recv_seq` 和 `sender_chain_key`
+
+**群聊序号与乱序容忍：**
+
+群聊中，每个 `(sender_did, epoch, sender_key_id)` 维度维护独立的 `recv_seq`。序号验证策略与私聊一致（参见 8.3.4）：
+- **严格模式**：要求 `seq == recv_seq`
+- **窗口模式（推荐）**：允许 `recv_seq <= seq < recv_seq + MAX_SKIP`，跳过的 msg_key 可缓存
+
+无论哪种模式，已使用过的 `seq` **必须**拒绝重复解密（防重放）。
+
+#### 8.5.5 Epoch 轮转（成员变更）
+
+当群组成员发生变更时，epoch 递增以保证前向和后向安全：
+
+**管理员身份与信任锚：**
+
+`group_epoch_advance` 消息的发送者**必须**具有群管理员权限。群管理员的身份由 Message Server 的群组管理 API 定义和维护（参见第 6 节群组管理相关接口）。具体而言：
+- 群创建者默认为群管理员。
+- Message Server 在转发 `group_epoch_advance` 消息前，**应**验证发送者是否为群管理员。非管理员发送的 `group_epoch_advance` 消息**应**被 Message Server 拒绝。
+- 接收方在处理 `group_epoch_advance` 时，通过 `proof.verification_method` 验证签名者身份，并**应**检查该签名者是否为已知的群管理员（管理员列表可通过群组管理 API 获取或由先前的群元数据消息缓存）。
+- 客户端**不应**完全依赖 Message Server 的管理员校验——客户端**必须**独立验证 `proof` 签名，确保即使 Message Server 被攻破或存在恶意行为，也无法伪造 epoch 变更。
+
+**轮转流程：**
+
+1. 群管理员（或服务端）发送 `group_epoch_advance` 消息，通告新 epoch 和变更原因
+2. 所有留在群内的成员转入新 epoch，旧 epoch 的 Sender Key 按以下规则处理：
+   - **必须**将旧 epoch 的 `sender_chain_key` 状态标记为只读，**禁止**使用旧 epoch 密钥发送新消息
+   - **应**保留旧 epoch 的 `sender_chain_key`（只读模式），以便解密延迟到达的旧 epoch 消息
+   - 旧 epoch 密钥的保留时间**建议**不超过 3600 秒（1 小时），过期后**应**销毁
+3. 每个成员为新 epoch 重新生成 `sender_chain_key`
+4. 每个成员将新的 Sender Key 通过 `group_e2ee_key` 分发给其他所有当前群成员
+
+**安全保证：**
+
+- **前向安全（成员移除）**：被移除的成员无法获取新 epoch 的 Sender Keys，无法解密未来消息
+- **后向安全（成员加入）**：新加入的成员仅获得当前 epoch 的 Sender Keys，无法解密历史消息
+
+**epoch 递增触发条件：**
+
+| 触发事件 | reason 字段值 | 必需动作 |
+|----------|--------------|---------|
+| 成员加入 | `member_added` | epoch+1，**所有**现有成员**必须**重新生成 Sender Key 并向全体成员（含新成员）重新分发 |
+| 成员退出或被移除 | `member_removed` | epoch+1，**所有**留在群内的成员**必须**重新生成 Sender Key 并向全体成员重新分发 |
+| 主动密钥轮换 | `key_rotation` | epoch+1，**所有**成员**必须**重新生成 Sender Key 并重新分发 |
+
+**重要**：无论何种原因触发 epoch 递增，所有成员**必须**生成全新的 `sender_chain_key`（不得复用旧值），并通过 `group_e2ee_key` 向所有其他当前群成员重新分发。这确保：
+- 被移除成员无法使用旧密钥解密新 epoch 的消息（前向安全）
+- 新加入成员无法使用新密钥解密旧 epoch 的消息（后向安全）
+
+### 8.6 群聊 E2EE content 结构定义
+
+#### 8.6.1 group_e2ee_key — Sender Key 分发
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| group_did | string | 是 | 群组 DID |
+| epoch | integer | 是 | 群纪元 |
+| sender_did | string | 是 | Sender Key 所有者的 DID |
+| sender_key_id | string | 是 | Sender Key 标识 |
+| recipient_key_id | string | 是 | 接收方 DID 文档中 keyAgreement 的 id |
+| hpke_suite | string | 是 | HPKE 密码套件标识 |
+| enc | string | 是 | HPKE 封装密文（Base64 编码） |
+| encrypted_sender_key | string | 是 | HPKE AEAD 加密的 sender_chain_key（Base64 编码，含 tag） |
+| expires | integer | 否 | Sender Key 有效期（秒），默认 86400 |
+| proof | object | 是 | 发送方签名 |
+
+HPKE 加密 `sender_chain_key` 时的 AAD = `group_did + ":" + str(epoch) + ":" + sender_key_id` 的 UTF-8 编码。
+
+**content 示例：**
+
+```json
+{
+  "group_did": "did:wba:example.com:group:group_dev",
+  "epoch": 3,
+  "sender_did": "did:wba:example.com:user:alice",
+  "sender_key_id": "a1b2c3:3",
+  "recipient_key_id": "did:wba:example.com:user:bob#key-x25519-1",
+  "hpke_suite": "DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM",
+  "enc": "dGhpcyBpcyBhIDMyLWJ5dGUgZXBoZW1lcmFsIHB1YmxpYyBrZXk=",
+  "encrypted_sender_key": "ZW5jcnlwdGVkIHNlbmRlciBrZXkgZGF0YQ==",
+  "expires": 86400,
   "proof": {
     "type": "EcdsaSecp256r1Signature2019",
-    "created": "2024-05-27T10:52:00Z",
-    "verification_method": "did:wba:example.com:user:bob#keys-1",
-    "proof_value": "eyJhbGci..."
-  }
-}
-```
-
-#### 8.3.3 Finished
-
-握手完成确认消息，用于防止重放攻击。
-
-**字段定义：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| session_id | string | 会话 ID，使用 SourceHello 中的 session_id |
-| verify_data | object | 验证数据（AES-GCM 加密） |
-
-**verify_data 结构：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| iv | string | 初始化向量（Base64 编码） |
-| tag | string | 认证标签（Base64 编码） |
-| ciphertext | string | 加密数据（Base64 编码），明文为 `{"secretKeyId":"..."}` |
-
-**content 示例（JSON 序列化前）：**
-
-```json
-{
-  "session_id": "abc123session",
-  "verify_data": {
-    "iv": "dGVzdGl2MTIzNDU2",
-    "tag": "dGVzdHRhZzEyMzQ1Njc4",
-    "ciphertext": "ZW5jcnlwdGVkZGF0YQ=="
-  }
-}
-```
-
-#### 8.3.4 加密消息
-
-使用协商的短期密钥加密的消息。
-
-**字段定义：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| secret_key_id | string | 短期加密密钥 ID（16 个十六进制字符） |
-| original_type | string | 原始消息类型（如 `text`、`image`） |
-| encrypted | object | AES-GCM 加密数据 |
-
-**encrypted 结构：**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| iv | string | 初始化向量（Base64 编码） |
-| tag | string | 认证标签（Base64 编码） |
-| ciphertext | string | 加密密文（Base64 编码） |
-
-**content 示例（JSON 序列化前）：**
-
-```json
-{
-  "secret_key_id": "0123456789abcdef",
-  "original_type": "text",
-  "encrypted": {
-    "iv": "dGVzdGl2MTIzNDU2",
-    "tag": "dGVzdHRhZzEyMzQ1Njc4",
-    "ciphertext": "ZW5jcnlwdGVkbWVzc2FnZQ=="
+    "created": "2026-03-01T10:30:00Z",
+    "verification_method": "did:wba:example.com:user:alice#keys-1",
+    "proof_value": "MEUCIQDx..."
   }
 }
 ```
@@ -1098,232 +1481,141 @@ Alice                           Message Server                          Bob
   "params": {
     "sender_did": "did:wba:example.com:user:alice",
     "receiver_did": "did:wba:example.com:user:bob",
-    "content": "{\"secret_key_id\":\"0123456789abcdef\",\"original_type\":\"text\",\"encrypted\":{\"iv\":\"...\",\"tag\":\"...\",\"ciphertext\":\"...\"}}",
-    "type": "e2ee"
+    "group_did": "did:wba:example.com:group:group_dev",
+    "content": "{\"group_did\":\"did:wba:example.com:group:group_dev\",\"epoch\":3,\"sender_did\":\"did:wba:example.com:user:alice\",\"sender_key_id\":\"a1b2c3:3\",\"recipient_key_id\":\"did:wba:example.com:user:bob#key-x25519-1\",\"hpke_suite\":\"DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM\",\"enc\":\"...\",\"encrypted_sender_key\":\"...\",\"expires\":86400,\"proof\":{...}}",
+    "type": "group_e2ee_key"
   },
   "id": 1
 }
 ```
 
-#### 8.3.5 E2EE 错误消息
+#### 8.6.2 group_e2ee_msg — 群密文消息
 
-当密钥过期或未找到时，通知对方重新发起密钥协商。
+与 `e2ee_msg` 类似，`group_e2ee_msg` 不包含 `proof` 签名字段。认证性由 `sender_chain_key` 保证——只有持有正确 Sender Key 的一方才能生成有效密文，而 Sender Key 来自经 proof 签名认证的 `group_e2ee_key` 分发消息。
 
-**字段定义：**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| group_did | string | 是 | 群组 DID |
+| epoch | integer | 是 | 群纪元 |
+| sender_did | string | 是 | 发送者 DID |
+| sender_key_id | string | 是 | Sender Key 标识 |
+| seq | integer | 是 | 该 sender 在当前 epoch 内的消息序号 |
+| original_type | string | 是 | 原始消息类型（`text` / `image` / `file`） |
+| ciphertext | string | 是 | AES-128-GCM 密文 + tag（Base64 编码） |
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| error_code | string | 错误类型：`key_expired`（密钥过期）或 `key_not_found`（密钥未找到） |
-| secret_key_id | string | 相关的密钥 ID |
-
-**content 示例（JSON 序列化前）：**
+**content 示例：**
 
 ```json
 {
-  "error_code": "key_expired",
-  "secret_key_id": "0123456789abcdef"
+  "group_did": "did:wba:example.com:group:group_dev",
+  "epoch": 3,
+  "sender_did": "did:wba:example.com:user:alice",
+  "sender_key_id": "a1b2c3:3",
+  "seq": 0,
+  "original_type": "text",
+  "ciphertext": "ZW5jcnlwdGVkIGdyb3VwIG1lc3NhZ2U="
 }
 ```
 
-### 8.4 密钥协商过程
+**send 请求示例：**
 
-密钥协商过程基于 ECDHE（Elliptic Curve Diffie-Hellman Ephemeral），与 TLS 1.3 中交换加密密钥的过程基本类似。
-
-**支持的加密参数：**
-
-| 参数 | 当前支持值 |
-|------|-----------|
-| 密码套件 | `TLS_AES_128_GCM_SHA256` |
-| 椭圆曲线 | `secp256r1` |
-
-#### 8.4.1 共享密钥生成
-
-1. **获取对方公钥**：从对方 Hello 消息的 `key_shares`/`key_share` 中的 `key_exchange` 字段提取椭圆曲线公钥（十六进制格式）。
-2. **生成共享秘密**：使用本地私钥和对方公钥，通过 ECDH 算法生成共享秘密。
-3. **确定密钥长度**：根据密码套件确定密钥长度（`TLS_AES_128_GCM_SHA256` 对应 128 位 / 16 字节）。
-
-#### 8.4.2 短期加密密钥生成
-
-使用 HKDF（HMAC-based Extract-and-Expand Key Derivation Function）从共享秘密派生实际加密密钥：
-
-```python
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF, HKDFExpand
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
-
-hash_algorithm = hashes.SHA256()
-backend = default_backend()
-
-# 1. HKDF 提取阶段：从共享秘密提取伪随机密钥
-hkdf_extract = HKDF(
-    algorithm=hash_algorithm,
-    length=hash_algorithm.digest_size,
-    salt=b'\x00' * hash_algorithm.digest_size,
-    info=b'',
-    backend=backend
-)
-extracted_key = hkdf_extract.derive(shared_secret)
-
-# 2. 生成握手流量密钥
-def derive_secret(secret: bytes, label: bytes, messages: bytes) -> bytes:
-    hkdf_expand = HKDFExpand(
-        algorithm=hash_algorithm,
-        length=hash_algorithm.digest_size,
-        info=hkdf_label(hash_algorithm.digest_size, label, messages),
-        backend=backend
-    )
-    return hkdf_expand.derive(secret)
-
-source_hello_random = source_hello["random"].encode('utf-8')
-destination_hello_random = destination_hello["random"].encode('utf-8')
-
-source_data_traffic_secret = derive_secret(
-    extracted_key, b"s ap traffic",
-    source_hello_random + destination_hello_random
-)
-destination_data_traffic_secret = derive_secret(
-    extracted_key, b"d ap traffic",
-    source_hello_random + destination_hello_random
-)
-
-# 3. 扩展生成实际加密密钥
-source_data_key = HKDF(
-    algorithm=hash_algorithm,
-    length=key_length,  # 16 字节 (AES-128)
-    salt=None,
-    info=hkdf_label(32, b"key", source_data_traffic_secret),
-    backend=backend
-).derive(source_data_traffic_secret)
-
-destination_data_key = HKDF(
-    algorithm=hash_algorithm,
-    length=key_length,
-    salt=None,
-    info=hkdf_label(32, b"key", destination_data_traffic_secret),
-    backend=backend
-).derive(destination_data_traffic_secret)
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "send",
+  "params": {
+    "sender_did": "did:wba:example.com:user:alice",
+    "group_did": "did:wba:example.com:group:group_dev",
+    "content": "{\"group_did\":\"did:wba:example.com:group:group_dev\",\"epoch\":3,\"sender_did\":\"did:wba:example.com:user:alice\",\"sender_key_id\":\"a1b2c3:3\",\"seq\":0,\"original_type\":\"text\",\"ciphertext\":\"ZW5jcnlwdGVkIGdyb3VwIG1lc3NhZ2U=\"}",
+    "type": "group_e2ee_msg"
+  },
+  "id": 1
+}
 ```
 
-其中 `source_data_key` 为发起方加密密钥，`destination_data_key` 为接收方加密密钥。Source 发送消息时使用 `source_data_key` 加密，Destination 使用 `source_data_key` 解密；反之亦然。
+#### 8.6.3 group_epoch_advance — 群纪元变化通知
 
-#### 8.4.3 secretKeyId 生成方法
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| group_did | string | 是 | 群组 DID |
+| new_epoch | integer | 是 | 新的 epoch 值 |
+| reason | string | 是 | 变更原因：`member_added` / `member_removed` / `key_rotation` |
+| members_added | array | 否 | 新加入的成员 DID 列表 |
+| members_removed | array | 否 | 被移除的成员 DID 列表 |
+| proof | object | 是 | 群管理员签名 |
 
-`secret_key_id` 是 Source 和 Destination 之间的短期加密密钥 ID，用于标识消息使用哪个密钥加密。密钥 ID 仅在密钥有效期内有效。
+**content 示例：**
 
-生成步骤：
-
-1. 将 SourceHello 和 DestinationHello 中的 `random` 字段拼接（SourceHello 在前，DestinationHello 在后，无连接符）
-2. 将拼接字符串使用 UTF-8 编码转换为字节序列
-3. 使用 HKDF 派生 8 字节
-4. 将 8 字节编码为 16 个十六进制字符
-
-```python
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
-
-def generate_secret_key_id(source_random: str, destination_random: str) -> str:
-    content = source_random + destination_random
-    random_bytes = content.encode('utf-8')
-
-    hkdf = HKDF(
-        algorithm=hashes.SHA256(),
-        length=8,  # 生成 8 字节
-        salt=None,
-        info=b'',
-        backend=default_backend()
-    )
-
-    derived_key = hkdf.derive(random_bytes)
-    return derived_key.hex()  # 16 个十六进制字符
+```json
+{
+  "group_did": "did:wba:example.com:group:group_dev",
+  "new_epoch": 4,
+  "reason": "member_removed",
+  "members_added": [],
+  "members_removed": ["did:wba:example.com:user:charlie"],
+  "proof": {
+    "type": "EcdsaSecp256r1Signature2019",
+    "created": "2026-03-01T11:00:00Z",
+    "verification_method": "did:wba:example.com:user:admin#keys-1",
+    "proof_value": "MEUCIQDx..."
+  }
+}
 ```
 
-#### 8.4.4 AES-GCM 加密/解密
+### 8.7 签名与验证
 
-使用 `TLS_AES_128_GCM_SHA256` 进行消息加密：
+#### 8.7.1 proof_value 生成过程
 
-```python
-import os
-import base64
-from typing import Dict
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
-
-def encrypt_aes_gcm(data: bytes, key: bytes) -> Dict[str, str]:
-    """AES-128-GCM 加密"""
-    if len(key) != 16:
-        raise ValueError("Key must be 128 bits (16 bytes).")
-
-    iv = os.urandom(12)  # GCM 推荐 12 字节 IV
-
-    encryptor = Cipher(
-        algorithms.AES(key),
-        modes.GCM(iv),
-        backend=default_backend()
-    ).encryptor()
-
-    ciphertext = encryptor.update(data) + encryptor.finalize()
-    tag = encryptor.tag
-
-    return {
-        "iv": base64.b64encode(iv).decode('utf-8'),
-        "tag": base64.b64encode(tag).decode('utf-8'),
-        "ciphertext": base64.b64encode(ciphertext).decode('utf-8')
-    }
-```
-
-### 8.5 签名与验证
-
-#### 8.5.1 proofValue 生成过程
-
-SourceHello 和 DestinationHello 消息都需要签名以确保消息完整性和身份验证。
+需要签名的 E2EE 消息包括：`e2ee_init`、`e2ee_rekey`、`group_e2ee_key`、`group_epoch_advance`。
 
 **生成步骤：**
 
 1. 构造消息的所有字段，`proof` 中的 `proof_value` 字段除外
-2. 将待签名的 JSON 转换为 JSON 字符串，使用逗号和冒号作为分隔符，并**按键排序**
-3. 将 JSON 字符串编码为 UTF-8 字节
-4. 使用 ECDSA + SHA-256 算法签名
+2. 使用 JCS（JSON Canonicalization Scheme, RFC 8785）对 JSON 进行规范化
+3. 将规范化后的 JSON 字符串编码为 UTF-8 字节
+4. 使用 ECDSA + SHA-256 算法签名（使用 DID 文档 `authentication` 中的签名密钥）
 5. 将签名值 Base64URL 编码后写入 `proof_value` 字段
 
 ```python
 import json
 import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
 
 # 1. 构造消息，排除 proof_value 字段
 msg = {
-    "e2ee_type": "source_hello",
+    "session_id": "a1b2c3d4e5f60718a1b2c3d4e5f60718",
+    "hpke_suite": "DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM",
     # ... 其他字段
     "proof": {
         "type": "EcdsaSecp256r1Signature2019",
-        "created": "2024-05-27T10:51:55Z",
+        "created": "2026-03-01T10:30:00Z",
         "verification_method": "did:wba:example.com:user:alice#keys-1"
         # proof_value 除外
     }
 }
 
-# 2. 转换为排序的 JSON 字符串
-msg_str = json.dumps(msg, separators=(',', ':'), sort_keys=True)
+# 2. JCS 规范化（RFC 8785）
+# JCS 规范化使用确定性的 JSON 序列化，确保相同对象始终产生相同字节表示
+msg_canonical = jcs_canonicalize(msg)  # 按 RFC 8785 规范化
 
 # 3. 编码为 UTF-8 字节
-msg_bytes = msg_str.encode('utf-8')
+msg_bytes = msg_canonical.encode('utf-8')
 
 # 4. 使用 ECDSA + SHA-256 签名
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-
 signature = private_key.sign(msg_bytes, ec.ECDSA(hashes.SHA256()))
 
 # 5. Base64URL 编码
 msg["proof"]["proof_value"] = base64.urlsafe_b64encode(signature).decode('utf-8')
 ```
 
-#### 8.5.2 验证 SourceHello/DestinationHello 消息
+#### 8.7.2 签名验证过程
 
-1. **解析消息**：提取各个字段。
-2. **验证 DID 与公钥**：读取 `source_did` 和 `verification_method` 中的公钥，使用 DID 方法规范中的 DID 生成方法，用公钥生成 DID，确认是否与 `source_did` 一致。
-3. **验证签名**：使用 `source_did` 对应的公钥，验证 `proof` 字段的签名是否正确。
-4. **验证其他字段**：检查 `random` 字段的随机性，防止重放攻击；检查 `proof` 的 `created` 字段，确保签名时间未过期。
+1. **提取签名**：从消息中取出 `proof.proof_value`，Base64URL 解码得到签名字节
+2. **重构待验证数据**：从消息中去除 `proof.proof_value` 字段，对剩余 JSON 做 JCS 规范化
+3. **获取公钥**：根据 `proof.verification_method` 引用的 ID，从发送方 DID 文档中获取对应的签名公钥
+4. **验证签名**：使用公钥和 ECDSA + SHA-256 验证签名
+5. **验证时间戳**：检查 `proof.created` 时间是否在合理范围内（建议 ±300 秒窗口，即允许最多 5 分钟的时钟偏差）。超出窗口的消息**应**被拒绝。
 
 ## 9. 安全性考虑
 
@@ -1333,49 +1625,84 @@ msg["proof"]["proof_value"] = base64.urlsafe_b64encode(signature).decode('utf-8'
 
 ### 9.2 身份认证安全
 
-身份认证遵循 ANP DID WBA 认证机制。有关基于 DID 的身份认证安全详细说明，请参见 [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)。已认证用户发送消息时，服务端校验 `sender_did` 与认证身份的一致性。
+身份认证遵循 ANP DID WBA 认证机制。有关基于 DID 的身份认证安全详细说明，请参见 [DID:WBA 方法设计规范](03-did-wba方法规范.md)。已认证用户发送消息时，服务端校验 `sender_did` 与认证身份的一致性。
 
-### 9.3 E2EE 安全
+### 9.3 私聊 E2EE 安全
 
-- **服务端透明转发**：E2EE 消息的 `content` 字段对服务端不透明，服务端无法读取加密内容。
-- **前向安全性**：使用 ECDHE 临时密钥交换，每次会话生成新的密钥对，即使长期密钥泄露，过去的通信也无法被解密。
-- **密钥有效期**：短期密钥有明确的有效期，过期后必须重新协商。
+- **服务端透明转发**：所有 E2EE content 对服务端不透明，服务端无法读取 root_seed 或会话密钥。
+- **会话初始化安全**：HPKE Base 模式使用临时 Diffie-Hellman 密钥封装，第三方被动攻击者在不知道接收方 X25519 私钥的情况下，无法从 `enc` 恢复 `root_seed`。但需要注意：**HPKE Base 模式不提供对接收方静态密钥泄露的前向安全保护**——若接收方的 X25519 长期私钥在未来被泄露，攻击者可结合先前截获的 `enc` 和 `encrypted_seed` 恢复 `root_seed`，进而推导该会话的所有消息密钥。
 
-### 9.4 防重放攻击
+  | 泄露场景 | 能否恢复历史 root_seed | 说明 |
+  |---------|---------------------|------|
+  | 发送方临时私钥泄露 | 否 | HPKE 临时密钥对仅在 Seal 时使用，不持久化 |
+  | 接收方 X25519 静态私钥泄露 | **是** | 可结合截获的 `enc` 执行 HPKE.Open 恢复 root_seed |
+  | 双方静态私钥均泄露 | **是** | 同上，接收方私钥即可解密 |
 
-- **random 字段**：SourceHello 和 DestinationHello 中的 `random` 字段确保每次握手的唯一性。
-- **secretKeyId 校验**：Finished 消息中包含 `secret_key_id`，用于验证密钥协商的完整性。
-- **时间戳校验**：`proof` 中的 `created` 字段用于检查签名时间是否在合理范围内。
+  建议定期轮换 X25519 密钥（更新 DID 文档中的 keyAgreement）以缩小密钥泄露的影响窗口，并通过 `e2ee_rekey` 重建会话密钥。
+- **消息级前向安全**：链式 ratchet 确保每条消息使用独立的 msg_key，且 chain_key 单向更新，无法从当前 chain_key 反推已丢弃的旧 chain_key 和 msg_key。在 root_seed 和 chain_key 已被安全删除的前提下，即使后续 chain_key 泄露也无法恢复历史消息。
+- **密钥分离**：签名密钥（ECDSA secp256r1）和密钥协商密钥（X25519）物理分离，泄露其中一个不影响另一个的安全性。
+- **认证性**：`e2ee_init` / `e2ee_rekey` 携带发送方的 proof 签名，接收方可验证发起者的身份。
+- **密钥泄露风险**：由于 `e2ee_msg` 不携带逐条签名（认证性依赖对称会话密钥），若 `chain_key` 或 `root_seed` 泄露，攻击者可伪造该会话内后续的加密消息。因此，`chain_key` **必须**在使用后立即更新并销毁旧值，`root_seed` 在派生 chain_key 后**应**立即销毁。
+
+### 9.4 群聊 E2EE 安全
+
+- **前向安全（成员移除）**：成员被移除后，epoch 递增，所有留在群内的成员重新生成 Sender Keys。被移除成员无法获取新 epoch 的 Sender Keys，无法解密未来消息。
+- **后向安全（成员加入）**：新加入的成员仅获得当前 epoch 的 Sender Keys，无法解密历史消息。
+- **Sender Key 独立分发**：每个成员的 Sender Key 通过 HPKE 独立封装给每个接收者，单个接收者的密钥泄露不影响其他接收者。
+- **epoch 签名**：`group_epoch_advance` 消息携带管理员签名，防止伪造 epoch 变更。
+- **Sender Key 泄露风险**：Sender Key 模型下，所有群成员都持有每个发送者的 `sender_chain_key`。若某成员设备被攻破导致其 `sender_chain_key` 泄露，攻击者可伪造该发送者在当前 epoch 内的后续群消息，直到 epoch 轮转。这是 Sender Key 方案的已知限制，可通过缩短 epoch 轮换周期（如定期 `key_rotation`）来缩小影响窗口。
+
+### 9.5 密钥管理安全
+
+- X25519 密钥协商密钥**应**（SHOULD）定期轮换（更新 DID 文档中的 keyAgreement），轮换后**应**主动向活跃会话的对端发送 `e2ee_rekey` 以使用新密钥重建会话。
+- 会话密钥（root_seed、sender_chain_key）仅存在于双方内存中，不应持久化到磁盘。
+- 链式 ratchet 的 chain_key **必须**在使用后立即更新，旧值**必须**立即销毁。
+
+### 9.6 防重放攻击
+
+- **序号防重放**：`e2ee_msg` 和 `group_e2ee_msg` 的 `seq` 字段严格递增，接收方拒绝任何已使用过的 seq 值的消息（无论严格模式还是窗口模式）。
+- **session_id 唯一性**：每次 `e2ee_init` / `e2ee_rekey` 生成新的随机 session_id。
+- **epoch + sender_key_id 唯一性**：群聊中 epoch + sender_key_id 组合唯一标识一个 Sender Key 生命周期。
+- **proof 时间戳**：签名中的 `created` 时间戳用于检测过期消息。
 
 ## 10. 局限性
 
-### 10.1 E2EE 仅限私聊
+### 10.1 群聊 E2EE 的 O(N) 分发成本
 
-当前 E2EE 方案仅支持两个 Agent 之间的一对一加密通信，不支持群聊场景下的端到端加密。群聊消息通过服务端明文转发。未来可能引入群组 E2EE 方案（如 MLS 协议）。
+Sender Key 分发时需要对每个群成员独立执行 HPKE 封装，群成员数 N 较大时开销显著。未来可考虑 MLS (RFC 9420) 的树形密钥分发方案优化。
 
-### 10.2 大文件传输效率
+### 10.2 单设备限制
+
+在本规范版本中，一个 DID **不得**同时在多个设备上活跃使用 E2EE 功能。多设备并发会导致 ratchet 状态冲突、群聊 Sender Key 混乱和会话状态丢失。多设备密钥同步机制将在未来版本中定义。
+
+### 10.3 大文件传输效率
 
 消息内容通过 JSON 的 `content` 字段传输，对于大文件（如视频）的传输效率不高。建议在 `content` 中传递文件的 URL 和解密密钥，接收者通过 HTTPS 等协议单独下载文件。
 
 ## 11. 总结与展望
 
-本规范定义了基于 HTTP + JSON-RPC 2.0 的即时消息协议，以 `did:wba` 为身份标识，支持私聊、群聊和端到端加密通信。通过与智能体描述协议的集成，智能体可以以标准化方式声明其 E2EE IM 能力，实现自动发现和互操作。相比原有的 WebSocket 方案，本协议具有更好的简单性、兼容性和可扩展性。
+本规范定义了基于 HTTP + JSON-RPC 2.0 的即时消息协议，以 `did:wba` 为身份标识，支持私聊和群聊的端到端加密通信。E2EE 方案基于 HPKE (RFC 9180)，采用密钥分离设计，私聊通过一步 HPKE 初始化 + 链式 ratchet 实现会话加密，群聊通过 Sender Keys + epoch 轮转实现群体加密。
+
+通过与智能体描述协议的集成，智能体可以以标准化方式声明其 E2EE IM 能力，实现自动发现和互操作。
 
 未来的工作方向包括：
 
-1. **群组 E2EE**：探索群聊场景下的端到端加密方案
-2. **离线消息**：完善离线消息的推送和同步机制
-3. **消息类型扩展**：支持更丰富的消息类型（如音视频通话信令）
-4. **跨服务器互通**：定义 Message Server 之间的联邦协议
+1. **MLS 协议集成**：探索 MLS (RFC 9420) 的树形密钥管理方案，优化大群组的 Sender Key 分发效率
+2. **多设备密钥同步**：定义同一 DID 跨多个设备的密钥同步和会话管理机制
+3. **离线消息**：完善离线消息的推送和同步机制
+4. **消息类型扩展**：支持更丰富的消息类型（如音视频通话信令）
+5. **跨服务器互通**：定义 Message Server 之间的联邦协议
 
 ## 参考文献
 
+- [RFC 9180] Hybrid Public Key Encryption (HPKE)
+- [RFC 8785] JSON Canonicalization Scheme (JCS)
 - [RFC 7159] The JavaScript Object Notation (JSON) Data Interchange Format
 - [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
-- [ANP 技术白皮书](01-agentnetworkprotocol-technical-white-paper.md)
-- [DID:WBA 方法设计规范](03-did-wba-method-design-specification.md)
-- [04-基于DID的端到端加密通信技术协议](chinese/message/04-基于did的端到端加密通信技术协议.md)
-- [05-基于DID的消息服务协议](chinese/message/05-基于did的消息服务协议.md)
+- [W3C DID Core Specification](https://www.w3.org/TR/did-core/)
+- [ANP 技术白皮书](01-AgentNetworkProtocol技术白皮书.md)
+- [DID:WBA 方法设计规范](03-did-wba方法规范.md)
+- [智能体描述协议规范](07-ANP-智能体描述协议规范.md)
 
 ## 版权声明
 

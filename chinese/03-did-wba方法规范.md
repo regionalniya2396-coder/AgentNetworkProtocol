@@ -88,10 +88,29 @@ did:wba:example.com%3A3000
           "kty": "EC",
           "kid": "WjKgJV7VRw3hmgU6--4v15c0Aewbcvat1BsRFTIqa5Q"
         }
+      },
+      {
+        "id": "did:wba:example.com%3A8800:user:alice#keys-p256-1",
+        "type": "EcdsaSecp256r1VerificationKey2019",
+        "controller": "did:wba:example.com%3A8800:user:alice",
+        "publicKeyJwk": {
+          "crv": "P-256",
+          "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+          "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+          "kty": "EC",
+          "kid": "keys-p256-1"
+        }
+      },
+      {
+        "id": "did:wba:example.com%3A8800:user:alice#key-x25519-1",
+        "type": "X25519KeyAgreementKey2019",
+        "controller": "did:wba:example.com%3A8800:user:alice",
+        "publicKeyMultibase": "z9hFgmPVfmBZwRvFEyniQDBkz9LmV7gDEqytWyGZLmDXE"
       }
     ],
     "authentication": [
       "did:wba:example.com%3A8800:user:alice#WjKgJV7VRw3hmgU6--4v15c0Aewbcvat1BsRFTIqa5Q",
+      "did:wba:example.com%3A8800:user:alice#keys-p256-1",
       {
         "id": "did:wba:example.com%3A8800:user:alice#key-1",
         "type": "Ed25519VerificationKey2020",
@@ -100,12 +119,7 @@ did:wba:example.com%3A3000
       }
     ],
     "keyAgreement": [
-      {
-        "id": "did:wba:example.com%3A8800:user:alice#key-2",
-        "type": "X25519KeyAgreementKey2019",
-        "controller": "did:wba:example.com%3A8800:user:alice",
-        "publicKeyMultibase": "z9hFgmPVfmBZwRvFEyniQDBkz9LmV7gDEqytWyGZLmDXE"
-      }
+      "did:wba:example.com%3A8800:user:alice#key-x25519-1"
     ],
     "humanAuthorization": [
       "did:wba:example.com%3A8800:user:alice#WjKgJV7VRw3hmgU6--4v15c0Aewbcvat1BsRFTIqa5Q",
@@ -132,7 +146,7 @@ did:wba:example.com%3A3000
 
 - **id**: 必须字段，不可以携带IP，但是可以携带端口，携带端口时，冒号需要编码为%3A。后面使用冒号进行路径分割。
 
-- **verificationMethod**: 必须字段，包含验证方法的数组，定义了用于验证DID主体的公钥信息。
+- **verificationMethod**: 必须字段，包含验证方法的数组，定义了用于验证DID主体的公钥信息。对于需要支持端到端加密（E2EE）通信的场景，`verificationMethod` 中**应**同时包含签名密钥和密钥协商密钥，实现密钥分离。签名密钥（如 EcdsaSecp256r1VerificationKey2019）用于身份认证和 E2EE 签名；密钥协商密钥（如 X25519KeyAgreementKey2019）用于 HPKE 密钥封装。两类密钥各司其职，单一密钥泄露不会同时影响身份认证和通信机密性。
   - **子字段**:
     - **id**: 验证方法的唯一标识符。
     - **type**: 验证方法的类型。
@@ -146,7 +160,7 @@ did:wba:example.com%3A3000
     - **controller**: 控制该验证方法的DID。
     - **publicKeyMultibase**: Multibase格式的公钥信息
 
-- **keyAgreement**: 可选字段，定义了用于密钥协商的公钥信息，可以用于两个DID之间的加密通信。验证方法一般使用X25519KeyAgreementKey2019等可以用于密钥交换的密钥协商算法。
+- **keyAgreement**: 可选字段，定义了用于密钥协商的公钥信息，可以用于两个DID之间的加密通信。验证方法一般使用X25519KeyAgreementKey2019等可以用于密钥交换的密钥协商算法。`keyAgreement` 可以是字符串引用（指向 `verificationMethod` 中的条目）或嵌入式对象。对于端到端加密（E2EE）场景（详见 [09-ANP-端到端即时消息协议规范](09-ANP-端到端即时消息协议规范.md)），此字段用于 HPKE 密钥封装，**应**包含 `X25519KeyAgreementKey2019` 类型的条目。如果 DID 文档中没有 `keyAgreement` 或没有 X25519 类型条目，则表示该智能体不支持 E2EE。
   - **子字段**:
     - **id**: 密钥协商方法的唯一标识符。
     - **type**: 密钥协商方法的类型。
@@ -167,8 +181,9 @@ did:wba:example.com%3A3000
 
 > 注意：
 > 1. 公钥信息目前支持两种格式，publicKeyJwk和publicKeyMultibase。详细见[https://www.w3.org/TR/did-extensions-properties/#verification-method-properties](https://www.w3.org/TR/did-extensions-properties/#verification-method-properties)。
-> 2. 验证方法类型定义见[https://www.w3.org/TR/did-extensions-properties/#verification-method-types](https://www.w3.org/TR/did-extensions-properties/#verification-method-types)。目前支持的类型有：EcdsaSecp256k1VerificationKey2019、Ed25519VerificationKey2018、X25519KeyAgreementKey2019。（Ed25519VerificationKey2020、JsonWebKey2020等暂不支持）
+> 2. 验证方法类型定义见[https://www.w3.org/TR/did-extensions-properties/#verification-method-types](https://www.w3.org/TR/did-extensions-properties/#verification-method-types)。目前支持的类型有：EcdsaSecp256k1VerificationKey2019、EcdsaSecp256r1VerificationKey2019、Ed25519VerificationKey2018、Ed25519VerificationKey2020、X25519KeyAgreementKey2019。其中，EcdsaSecp256r1VerificationKey2019 用于端到端加密场景中的签名验证（详见 [09-ANP-端到端即时消息协议规范](09-ANP-端到端即时消息协议规范.md)）。
 > 3. AgentDescription是一个新增的服务类型，用于支持智能体描述文档的发现。
+> 4. 对于需要支持端到端加密通信的场景，建议采用密钥分离设计：签名密钥（ECDSA secp256r1 或 secp256k1）与密钥协商密钥（X25519）分开管理。签名密钥不参与密钥协商，密钥协商密钥不参与签名。详细的 E2EE 协议设计参见 [09-ANP-端到端即时消息协议规范](09-ANP-端到端即时消息协议规范.md)。
 
 ### 2.5 DID方法操作
 
