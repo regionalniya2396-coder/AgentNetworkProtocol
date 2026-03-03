@@ -174,7 +174,7 @@ This protocol uses JSON-RPC 2.0 standard error codes with extended business erro
 | -32000 | Unauthenticated | Authentication required but no valid credentials provided |
 | -32001 | Unauthorized | Authenticated but no permission to perform the operation |
 | -32002 | Not Found | Requested resource (DID, message, etc.) does not exist |
-| -32003 | Conflict | Resource already exists or state conflict |
+| -32003 | Conflict | Resource already exists or state conflict (including duplicate client_msg_id submissions beyond the idempotency window) |
 | -32004 | Business Validation Error | Business rule validation failed |
 | -32005 | Rate Limited | Request too frequent, rate limited by server |
 
@@ -196,11 +196,103 @@ HTTP binding is suitable for most scenarios, especially for stateless, firewall-
 #### 4.3.2 WebSocket Transport Binding
 
 - **Protocol**: WebSocket (ws/wss)
+- **Endpoint Path**: `/message/ws` (under the message service prefix)
 - **Content Format**: Each WebSocket message is a complete JSON-RPC 2.0 JSON object
 - **Character Encoding**: UTF-8
-- **Connection Management**: After the client establishes a WebSocket connection, multiple JSON-RPC messages can be sent and received over the same connection
+- **Connection Management**: After the client establishes a WebSocket connection, multiple JSON-RPC messages can be sent and received over the same connection. The server supports multiple concurrent connections per user (e.g., multi-device scenarios).
 
 WebSocket binding is suitable for scenarios requiring real-time push (e.g., instant message notifications), where the server can proactively push new messages to clients without requiring client-side inbox polling.
+
+##### Authentication
+
+WebSocket connections **MUST** be authenticated during the handshake phase. Implementations **MUST** support at least one of the following authentication methods:
+
+| Method | Mechanism | Description |
+|--------|-----------|-------------|
+| Bearer JWT | `Authorization: Bearer <jwt_token>` header | **Recommended**. The server verifies the JWT locally using the pre-configured public key (RS256). |
+| DID WBA | `Authorization: DID-WBA <signature>` header | The server forwards the authorization header to the DID authentication endpoint for verification. |
+| JWT Query Parameter | `?token=<jwt_token>` query parameter | For environments where custom headers are not supported (e.g., browser WebSocket API). Verification is identical to Bearer JWT. |
+
+If authentication fails, the server **MUST** close the WebSocket connection with close code `4001` and reason `Unauthorized`.
+
+Upon successful authentication, the server resolves the authenticated DID to an internal user identifier. The authenticated DID is automatically injected as `sender_did` for subsequent `send` requests if not explicitly provided by the client.
+
+##### Client → Server: Requests
+
+Clients send JSON-RPC 2.0 requests over the WebSocket connection. The supported methods are:
+
+**`send` — Send Message**
+
+The `send` method uses the same parameters as defined in [Section 6.1.1](#611-send--send-message), with the following WebSocket-specific behaviors:
+
+- `sender_did` is automatically injected from the authenticated identity if not provided.
+- The response is a standard JSON-RPC 2.0 response with the same `id` as the request.
+- Messages sent via WebSocket trigger the same push notification pipeline as HTTP-sent messages.
+
+**`ping` — Application-Layer Heartbeat**
+
+```json
+{"jsonrpc": "2.0", "method": "ping"}
+```
+
+The server responds with:
+
+```json
+{"jsonrpc": "2.0", "method": "pong"}
+```
+
+Clients **SHOULD** send periodic `ping` messages to keep the connection alive. The ping interval **MUST** be shorter than the server's idle timeout (default: 300 seconds). A recommended interval is 120 seconds.
+
+##### Server → Client: Push Notifications
+
+When a new message is delivered to a user (via any transport — HTTP or WebSocket), the server pushes a JSON-RPC 2.0 **Notification** (no `id` field) to all of the user's active WebSocket connections:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "new_message",
+  "params": {
+    "id": "msg-uuid-001",
+    "server_seq": 42,
+    "sender_did": "did:wba:example.com:user:alice",
+    "sender_name": "Alice",
+    "sender_avatar": "https://example.com/avatar.jpg",
+    "receiver_did": "did:wba:example.com:user:bob",
+    "group_did": null,
+    "group_name": null,
+    "content": "Hello!",
+    "type": "text",
+    "sent_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+**Notification params fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Message ID |
+| server_seq | integer | Server-assigned monotonically increasing sequence number within the conversation |
+| sender_did | string | Sender DID |
+| sender_name | string \| null | Sender display name |
+| sender_avatar | string \| null | Sender avatar URL |
+| receiver_did | string \| null | Receiver DID (private chat only, null for group chat) |
+| group_did | string \| null | Group DID (group chat only, null for private chat) |
+| group_name | string \| null | Group name (group chat only) |
+| content | string | Message content (plaintext or E2EE JSON string) |
+| type | string | Message type (same values as `send` method) |
+| sent_at | string \| null | Client send timestamp (ISO 8601) |
+
+Push notifications are delivered only to users with active WebSocket connections. Offline messages are retrieved via the HTTP `get_inbox` method.
+
+##### Connection Lifecycle
+
+| Event | Behavior |
+|-------|----------|
+| Idle timeout | If no messages are received from the client within the idle timeout period (default: 300 seconds), the server closes the connection with code `1000` and reason `Idle timeout`. |
+| Client disconnect | The server removes the connection from the active connection pool. |
+| Server shutdown | All active connections are closed gracefully. |
+| Reconnection | Clients **SHOULD** implement reconnection with exponential backoff. After reconnecting, clients **SHOULD** call `get_inbox` to retrieve any messages missed during the disconnection period. |
 
 #### 4.3.3 Other Transport Bindings
 
@@ -242,6 +334,11 @@ An agent that supports the ANP E2EE IM protocol should include an entry in the `
           {
             "path": "/api/v1/groups/rpc",
             "description": "Group service endpoint for group management and group messages"
+          },
+          {
+            "path": "/message/ws",
+            "transport": "websocket",
+            "description": "WebSocket endpoint for real-time message push and bidirectional communication"
           }
         ],
         "e2ee": {
@@ -309,6 +406,7 @@ Send a message (private or group chat), also serving as the unified transport me
 | content | string | Yes | Message content (plaintext for regular messages, JSON serialized string for E2EE messages) |
 | type | string | No | Message type, default `text` |
 | timestamp | datetime | No | Client send timestamp |
+| client_msg_id | string | Yes | Client-generated globally unique message ID (UUIDv4/UUIDv7/ULID), used for idempotent deduplication |
 
 **type Values:**
 
@@ -341,7 +439,8 @@ Send a message (private or group chat), also serving as the unified transport me
     "sender_did": "did:wba:example.com:user:alice",
     "receiver_did": "did:wba:example.com:user:bob",
     "content": "Hello",
-    "type": "text"
+    "type": "text",
+    "client_msg_id": "01961e2c-45a0-7c8b-a4e3-f0a1b2c3d4e5"
   },
   "id": 1
 }
@@ -356,7 +455,8 @@ Send a message (private or group chat), also serving as the unified transport me
   "params": {
     "sender_did": "did:wba:example.com:user:alice",
     "group_did": "did:wba:example.com:group:group_dev",
-    "content": "Hello everyone"
+    "content": "Hello everyone",
+    "client_msg_id": "01961e2c-55b1-7d9c-b5f4-a1b2c3d4e5f6"
   },
   "id": 1
 }
@@ -369,6 +469,8 @@ Send a message (private or group chat), also serving as the unified transport me
   "jsonrpc": "2.0",
   "result": {
     "id": "msg_001",
+    "client_msg_id": "01961e2c-45a0-7c8b-a4e3-f0a1b2c3d4e5",
+    "server_seq": 42,
     "sender_did": "did:wba:example.com:user:alice",
     "sender_name": null,
     "receiver_did": "did:wba:example.com:user:bob",
@@ -382,7 +484,57 @@ Send a message (private or group chat), also serving as the unified transport me
 }
 ```
 
+**Response result Field Description:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Server-assigned message ID |
+| client_msg_id | string | Client-submitted idempotency key (echoed back as-is) |
+| server_seq | integer | Server-assigned monotonically increasing sequence number within the conversation, used for message ordering and gap detection |
+| sender_did | string | Sender DID |
+| sender_name | string \| null | Sender name |
+| receiver_did | string \| null | Receiver DID (private chat) |
+| group_did | string \| null | Group DID (group chat) |
+| content | string | Message content |
+| type | string | Message type |
+| sent_at | string \| null | Client send timestamp |
+| created_at | string | Server creation timestamp |
+
 See Section 8 for E2EE message request examples.
+
+##### 6.1.1.1 Idempotency and Ordering Mechanism
+
+**client_msg_id Idempotency Rules:**
+
+- Clients **MUST** generate a globally unique `client_msg_id` for every `send` request (UUIDv7 or ULID recommended, UUIDv4 compatible).
+- The server uses `(sender_did, client_msg_id)` as the idempotency key. If a duplicate idempotency key is received, the server **MUST** return the result from the first processing (same `id`, `server_seq`, and `created_at`) instead of creating a new message.
+- The idempotency window **SHOULD** be at least 24 hours. For duplicate `client_msg_id` submissions beyond the idempotency window, the server **MAY** return `-32003` (Conflict) error.
+- `client_msg_id` is used solely for transport-layer idempotent deduplication and is independent of and complementary to the E2EE layer's `seq` anti-replay mechanism.
+
+**server_seq Ordering Mechanism:**
+
+- `server_seq` is assigned by the server when the message is successfully persisted, starting from 1 and monotonically increasing (independently counted per conversation).
+- Dimension definitions:
+  - **Private chat**: `server_seq` increments within the `(min(A_did, B_did), max(A_did, B_did))` dimension, meaning the same pair of private chat participants share one sequence number space.
+  - **Group chat**: `server_seq` increments within the `group_did` dimension, meaning all messages within the same group share one sequence number space.
+- `server_seq` guarantees monotonic increase but **allows gaps** (e.g., due to database allocation strategies), and **does not allow regression**.
+- All query interfaces **MUST** return message lists sorted by `server_seq` in ascending order.
+
+**Client Gap Detection and Backfill:**
+
+- Clients **SHOULD** track the maximum received `server_seq` for each conversation.
+- When a message received via WebSocket push or query interface has a `server_seq` that is not contiguous with the local maximum (i.e., a gap exists), the client **SHOULD** call `get_history(since_seq=<local max server_seq>)` to backfill missing messages.
+- Backfilled messages are inserted into the local message list in ascending `server_seq` order.
+
+**server_seq vs E2EE seq Comparison:**
+
+| | server_seq | E2EE seq |
+|------|------|------|
+| **Assigned by** | Message Server | Sending client |
+| **Dimension** | Private=DID pair, Group=group_did | Private=session_id, Group=(sender_did, epoch, sender_key_id) |
+| **Purpose** | Message ordering, gap detection, incremental fetch | Key derivation, anti-replay |
+| **Visibility** | Plaintext, visible to all participants and server | Inside E2EE content, end-to-end only |
+| **Coverage** | All message types (plaintext + E2EE) | E2EE encrypted messages only (e2ee_msg, group_e2ee_msg) |
 
 #### 6.1.2 get_detail — Get Message Details
 
@@ -416,6 +568,7 @@ Get detailed information of a specified message.
   "jsonrpc": "2.0",
   "result": {
     "id": "msg_001",
+    "server_seq": 42,
     "sender_did": "did:wba:example.com:user:alice",
     "sender_name": null,
     "receiver_did": "did:wba:example.com:user:bob",
@@ -466,6 +619,7 @@ Query the current user's inbox messages.
     "messages": [
       {
         "id": "msg_001",
+        "server_seq": 42,
         "sender_did": "did:wba:example.com:user:alice",
         "sender_name": "Alice",
         "sender_avatar": "https://example.com/avatar/alice.png",
@@ -539,6 +693,7 @@ Get message history for private or group conversations.
 | peer_did | string | Conditional | Peer user DID (private chat, mutually exclusive with group_did) |
 | group_did | string | Conditional | Group DID (group chat, mutually exclusive with peer_did) |
 | since | datetime | No | Incremental query start time |
+| since_seq | integer | No | Only return messages with server_seq greater than this value. Mutually exclusive with since; if both are provided, since_seq takes precedence |
 | skip | int | No | Number of records to skip, default 0 |
 | limit | int | No | Number of records to return, default 50 |
 
@@ -579,6 +734,7 @@ Get message history for private or group conversations.
     "messages": [
       {
         "id": "msg_001",
+        "server_seq": 42,
         "sender_did": "did:wba:example.com:user:alice",
         "sender_name": "Alice",
         "receiver_did": "did:wba:example.com:user:bob",
@@ -595,6 +751,8 @@ Get message history for private or group conversations.
 }
 ```
 
+**Note:** The returned message list **MUST** be sorted by `server_seq` in ascending order.
+
 #### 6.1.6 get_batch_history — Batch Get Group Chat History
 
 Batch get message history for multiple group chats.
@@ -606,7 +764,7 @@ Batch get message history for multiple group chats.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | user_did | string | Yes | Current user DID |
-| queries | array | Yes | Query parameters for each group `[{group_did, since?}]` |
+| queries | array | Yes | Query parameters for each group `[{group_did, since?, since_seq?}]` |
 | limit | int | No | Max records per group, default 20 |
 
 **Request Example:**
@@ -619,7 +777,8 @@ Batch get message history for multiple group chats.
     "user_did": "did:wba:example.com:user:alice",
     "queries": [
       {"group_did": "did:wba:example.com:group:group_1"},
-      {"group_did": "did:wba:example.com:group:group_2", "since": "2024-01-15T00:00:00"}
+      {"group_did": "did:wba:example.com:group:group_2", "since": "2024-01-15T00:00:00"},
+      {"group_did": "did:wba:example.com:group:group_3", "since_seq": 100}
     ],
     "limit": 20
   },
@@ -649,6 +808,8 @@ Batch get message history for multiple group chats.
   "id": 1
 }
 ```
+
+**Note:** Each group's `messages` array contains message objects with a `server_seq` field, and **MUST** be sorted by `server_seq` in ascending order. `since_seq` and `since` within `queries` are mutually exclusive; if both are provided, `since_seq` takes precedence.
 
 #### 6.1.7 delete_inbox — Delete Inbox Messages
 
@@ -794,6 +955,7 @@ Get the message list for a specified group.
 | group_did | string | Yes | Group DID |
 | limit | int | No | Number of records to return, default 50, max 100 |
 | since | datetime | No | Only return messages after this time |
+| since_seq | integer | No | Only return messages with server_seq greater than this value. Mutually exclusive with since; if both are provided, since_seq takes precedence |
 
 **Request Example:**
 
@@ -818,6 +980,7 @@ Get the message list for a specified group.
     "messages": [
       {
         "id": "msg_010",
+        "server_seq": 42,
         "sender_did": "did:wba:example.com:user:alice",
         "sender_name": "Alice",
         "receiver_did": null,
@@ -833,6 +996,8 @@ Get the message list for a specified group.
   "id": 1
 }
 ```
+
+**Note:** The returned message list **MUST** be sorted by `server_seq` in ascending order.
 
 ## 7. Message Type Definitions
 
@@ -1028,10 +1193,19 @@ Alice                           Message Server                          Bob
 
 **Message Delivery Order Requirements:**
 
-The Message Server **MUST** guarantee that messages from the same sender to the same receiver are delivered in sending order (FIFO order). Specifically:
-- The `e2ee_init` message **MUST** be delivered to the receiver before subsequent `e2ee_msg` messages. If the receiver receives an `e2ee_msg` first and cannot find the corresponding session state for the `session_id`, it **SHOULD** buffer the message and wait for the `e2ee_init` to arrive, or return an `e2ee_error` (error_code: `session_not_found`).
-- The same applies to `e2ee_rekey` and subsequent `e2ee_msg` — `e2ee_rekey` **MUST** be delivered before any `e2ee_msg` using the new session_id.
-- For group chat, `group_e2ee_key` **MUST** be delivered to the corresponding receiver before the same sender's `group_e2ee_msg`.
+The Message Server **SHOULD** make best efforts to guarantee that messages from the same sender to the same receiver are delivered in sending order (FIFO order), but absolute FIFO delivery is not always achievable in distributed systems. The protocol provides **detectable and recoverable** ordering guarantees through `server_seq`:
+
+- Receivers detect whether the arrival order of messages meets expectations via `server_seq`. If a `server_seq` gap appears, the receiver **SHOULD** backfill missing messages via `get_history(since_seq=...)`.
+- The `e2ee_init` message **SHOULD** be delivered to the receiver before subsequent `e2ee_msg` messages. If the receiver receives an `e2ee_msg` first and cannot find the corresponding session state for the `session_id`, it **MUST** buffer the message (limit 64 messages, timeout 30 seconds) and wait for the `e2ee_init` to arrive. After the buffer timeout, it **SHOULD** discard the message and return an `e2ee_error` (error_code: `session_not_found`).
+- The same applies to `e2ee_rekey` and subsequent `e2ee_msg` — `e2ee_rekey` **SHOULD** be delivered before any `e2ee_msg` using the new session_id.
+- For group chat, `group_e2ee_key` **SHOULD** be delivered to the corresponding receiver before the same sender's `group_e2ee_msg`. See Section 8.5.3 for the missing key buffering strategy.
+
+**E2EE Message Serial Sending Constraint:**
+
+Within the same E2EE session, the sender **MUST** wait for the response of the previous `send` request before sending the next E2EE-type message (`e2ee_init`, `e2ee_msg`, `e2ee_rekey`, `group_e2ee_key`, `group_e2ee_msg`). This constraint ensures that the `server_seq` assignment order is consistent with the sender's E2EE `seq` order, allowing the receiver to infer E2EE `seq` ordering from `server_seq` ordering.
+
+- This constraint **applies only to E2EE-type messages**. Regular plaintext messages (`text`, `image`, `file`) can be sent concurrently.
+- E2EE messages across different sessions (different `session_id` or different `group_did`) can be sent concurrently.
 
 #### 8.3.3 Chain Ratchet Key Derivation
 
@@ -1165,6 +1339,7 @@ When E2EE communication encounters anomalies, the other party is notified via `e
 | `invalid_seq` | Sequence number mismatch | Initiator sends `e2ee_rekey` |
 | `unsupported_suite` | Unsupported HPKE cipher suite | Check the other party's capability declaration in AD document |
 | `no_key_agreement` | Other party's DID document has no keyAgreement | Fall back to plaintext communication or abort |
+| `sender_key_not_found` | Sender Key not received for the corresponding sender in group chat, buffer timeout | Sender redistributes `group_e2ee_key` |
 
 ### 8.4 Private Chat E2EE Content Structure Definitions
 
@@ -1224,7 +1399,8 @@ All E2EE data is transmitted via the `content` field of the `send` method (as JS
     "sender_did": "did:wba:example.com:user:alice",
     "receiver_did": "did:wba:example.com:user:bob",
     "content": "{\"session_id\":\"a1b2c3d4e5f60718a1b2c3d4e5f60718\",\"hpke_suite\":\"DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM\",\"sender_did\":\"did:wba:example.com:user:alice\",\"recipient_did\":\"did:wba:example.com:user:bob\",\"recipient_key_id\":\"did:wba:example.com:user:bob#key-x25519-1\",\"enc\":\"...\",\"encrypted_seed\":\"...\",\"expires\":86400,\"proof\":{\"type\":\"EcdsaSecp256r1Signature2019\",\"created\":\"2026-03-01T10:30:00Z\",\"verification_method\":\"did:wba:example.com:user:alice#keys-1\",\"proof_value\":\"...\"}}",
-    "type": "e2ee_init"
+    "type": "e2ee_init",
+    "client_msg_id": "01961e2c-60c2-7eac-c6a5-b2c3d4e5f607"
   },
   "id": 1
 }
@@ -1264,7 +1440,8 @@ All E2EE data is transmitted via the `content` field of the `send` method (as JS
     "sender_did": "did:wba:example.com:user:alice",
     "receiver_did": "did:wba:example.com:user:bob",
     "content": "{\"session_id\":\"a1b2c3d4e5f60718a1b2c3d4e5f60718\",\"seq\":0,\"original_type\":\"text\",\"ciphertext\":\"ZW5jcnlwdGVkIG1lc3NhZ2UgY29udGVudA==\"}",
-    "type": "e2ee_msg"
+    "type": "e2ee_msg",
+    "client_msg_id": "01961e2c-71d3-7fbd-d7b6-c3d4e5f60718"
   },
   "id": 1
 }
@@ -1370,6 +1547,22 @@ Alice (sender)                  Message Server           Bob (member), Carol (me
 The sender performs HPKE encapsulation separately for **each other member** in the group, sending independent distribution messages via `send(type=group_e2ee_key)`. The `enc` and `encrypted_sender_key` in each message differ because the recipients are different.
 
 **Sender Key Replay Rejection:** Receivers **MUST** reject `group_e2ee_key` messages with an already existing `(sender_did, epoch, sender_key_id)` combination. If a duplicate combination is received, it **MUST** be discarded, and the existing Sender Key state must not be overwritten. This prevents attackers from rolling back a receiver's Sender Key state to a known value by replaying old `group_e2ee_key` messages.
+
+**Missing Sender Key Buffering Strategy:**
+
+When a receiver receives a `group_e2ee_msg` but has not yet received the corresponding sender's `group_e2ee_key` (i.e., no local Sender Key exists for that `(sender_did, epoch, sender_key_id)`), it **MUST** follow this strategy:
+
+1. **Buffer the message**: The receiver **MUST** buffer the message in a local waiting queue rather than immediately discarding it.
+   - Buffer limit: Up to **64 messages** per `(sender_did, epoch, sender_key_id)` dimension.
+   - Buffer timeout: Maximum wait time of **30 seconds** per message.
+
+2. **Timeout handling**: After the buffer timeout, the receiver **SHOULD** discard the message and send an `e2ee_error` (error_code: `sender_key_not_found`) to the sender, notifying them to redistribute the Sender Key.
+
+3. **Processing upon key arrival**: When the corresponding `group_e2ee_key` arrives, the receiver **MUST** process all buffered messages in ascending `server_seq` order.
+
+4. **Post-timeout backfill**: After buffer timeout and discard, the receiver **MAY** backfill missing messages via `get_history(since_seq=<local max server_seq>)` and reprocess them after the Sender Key arrives.
+
+5. **Message Server responsibility**: The Message Server **SHOULD** make best efforts to deliver `group_e2ee_key` messages before the same sender's `group_e2ee_msg` messages to the corresponding receiver.
 
 #### 8.5.4 Group Message Encryption/Decryption
 
@@ -1487,7 +1680,8 @@ AAD for HPKE encryption of `sender_chain_key` = UTF-8 encoding of `group_did + "
     "receiver_did": "did:wba:example.com:user:bob",
     "group_did": "did:wba:example.com:group:group_dev",
     "content": "{\"group_did\":\"did:wba:example.com:group:group_dev\",\"epoch\":3,\"sender_did\":\"did:wba:example.com:user:alice\",\"sender_key_id\":\"a1b2c3:3\",\"recipient_key_id\":\"did:wba:example.com:user:bob#key-x25519-1\",\"hpke_suite\":\"DHKEM-X25519-HKDF-SHA256/HKDF-SHA256/AES-128-GCM\",\"enc\":\"...\",\"encrypted_sender_key\":\"...\",\"expires\":86400,\"proof\":{...}}",
-    "type": "group_e2ee_key"
+    "type": "group_e2ee_key",
+    "client_msg_id": "01961e2c-82e4-70ce-e8c7-d4e5f6071829"
   },
   "id": 1
 }
@@ -1531,7 +1725,8 @@ Similar to `e2ee_msg`, `group_e2ee_msg` does not include a `proof` signature fie
     "sender_did": "did:wba:example.com:user:alice",
     "group_did": "did:wba:example.com:group:group_dev",
     "content": "{\"group_did\":\"did:wba:example.com:group:group_dev\",\"epoch\":3,\"sender_did\":\"did:wba:example.com:user:alice\",\"sender_key_id\":\"a1b2c3:3\",\"seq\":0,\"original_type\":\"text\",\"ciphertext\":\"ZW5jcnlwdGVkIGdyb3VwIG1lc3NhZ2U=\"}",
-    "type": "group_e2ee_msg"
+    "type": "group_e2ee_msg",
+    "client_msg_id": "01961e2c-93f5-71df-f9d8-e5f607182930"
   },
   "id": 1
 }
@@ -1669,6 +1864,7 @@ Identity authentication follows the ANP DID WBA authentication mechanism. For de
 - **session_id uniqueness**: Each `e2ee_init` / `e2ee_rekey` generates a new random session_id.
 - **epoch + sender_key_id uniqueness**: In group chat, the epoch + sender_key_id combination uniquely identifies a Sender Key lifecycle.
 - **proof timestamp**: The `created` timestamp in signatures is used to detect expired messages.
+- **Complementary relationship between client_msg_id idempotency and E2EE seq anti-replay**: `client_msg_id` prevents duplicate message delivery caused by HTTP retries at the transport layer (deduplication performed by the Message Server), while E2EE `seq` prevents attackers from replaying captured ciphertext messages at the end-to-end layer (verified by the receiving client). The two mechanisms operate independently at different layers, collectively ensuring message uniqueness. Even if the Message Server is compromised or the `client_msg_id` idempotency check is bypassed, the E2EE `seq` anti-replay protection remains effective.
 
 ## 10. Limitations
 
