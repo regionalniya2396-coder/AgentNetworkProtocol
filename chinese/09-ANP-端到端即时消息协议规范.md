@@ -1458,6 +1458,7 @@ def decrypt_message(ciphertext_b64: str, enc_key: bytes, nonce: bytes,
 |------|------|------|------|
 | error_code | string | 是 | 错误码（见 8.3.6 错误码表） |
 | session_id | string | 否 | 关联的会话 ID |
+| failed_msg_id | string | 否 | 解密失败的消息 ID |
 | message | string | 否 | 可读错误描述 |
 
 **content 示例：**
@@ -1466,6 +1467,7 @@ def decrypt_message(ciphertext_b64: str, enc_key: bytes, nonce: bytes,
 {
   "error_code": "session_not_found",
   "session_id": "a1b2c3d4e5f60718a1b2c3d4e5f60718",
+  "failed_msg_id": "msg_20260305_abc123",
   "message": "E2EE session not found, please re-initialize"
 }
 ```

@@ -1461,6 +1461,7 @@ Semantic difference: `e2ee_rekey` indicates rebuilding an existing session key. 
 |-------|------|----------|-------------|
 | error_code | string | Yes | Error code (see error code table in 8.3.6) |
 | session_id | string | No | Associated session ID |
+| failed_msg_id | string | No | The message ID that failed to decrypt |
 | message | string | No | Human-readable error description |
 
 **Content Example:**
@@ -1469,6 +1470,7 @@ Semantic difference: `e2ee_rekey` indicates rebuilding an existing session key. 
 {
   "error_code": "session_not_found",
   "session_id": "a1b2c3d4e5f60718a1b2c3d4e5f60718",
+  "failed_msg_id": "msg_20260305_abc123",
   "message": "E2EE session not found, please re-initialize"
 }
 ```
