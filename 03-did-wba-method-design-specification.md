@@ -135,6 +135,11 @@ Apart from the DID Core specification, most other specifications are still in dr
         "id": "did:wba:example.com%3A8800:user:alice#agent-description",
         "type": "AgentDescription",
         "serviceEndpoint": "https://agent-network-protocol.com/agents/example/ad.json"
+      },
+      {
+        "id": "did:wba:example.com%3A8800:user:alice#handle",
+        "type": "HandleService",
+        "serviceEndpoint": "https://example.com/.well-known/handle/alice"
       }
     ]
 }
@@ -176,14 +181,17 @@ Apart from the DID Core specification, most other specifications are still in dr
 
 - **service**: Optional field that defines a list of services associated with the DID subject.
   - **id**: Unique identifier for the service.
-  - **type**: Type of service. For agent description service, use "AgentDescription".
-  - **serviceEndpoint**: URL endpoint of the service. For agent description service, this URL points to a document that follows the [ANP-Agent Description Protocol Specification](/07-anp-agent-description-protocol-specification.md).
+  - **type**: Type of service. The following types are currently supported:
+    - `AgentDescription`: Agent description service. The `serviceEndpoint` points to a document that follows the [ANP-Agent Description Protocol Specification](/07-anp-agent-description-protocol-specification.md).
+    - `HandleService`: Handle binding service, used for WNS (WBA Name Space) bidirectional binding verification. The `serviceEndpoint` points to the Handle Resolution Endpoint (e.g., `https://example.com/.well-known/handle/alice`). By declaring a HandleService in the DID Document, the DID holder confirms their binding relationship with the specified Handle, allowing verifiers to perform bidirectional verification and prevent Handle Providers from unilaterally tampering with mappings. See [04-ANP-DID:WBA Name Space Specification](04-anp-did-wba-name-space-specification.md) for details.
+  - **serviceEndpoint**: URL endpoint of the service.
 
 > Note:
 > 1. Public key information currently supports two formats: publicKeyJwk and publicKeyMultibase. For details, see [https://www.w3.org/TR/did-extensions-properties/#verification-method-properties](https://www.w3.org/TR/did-extensions-properties/#verification-method-properties).
 > 2. The definitions of verification method types can be found at [https://www.w3.org/TR/did-extensions-properties/#verification-method-types](https://www.w3.org/TR/did-extensions-properties/#verification-method-types). The currently supported types are: EcdsaSecp256k1VerificationKey2019, EcdsaSecp256r1VerificationKey2019, Ed25519VerificationKey2018, Ed25519VerificationKey2020, X25519KeyAgreementKey2019. Among these, EcdsaSecp256r1VerificationKey2019 is used for signature verification in end-to-end encryption scenarios (see [09-ANP E2EE Instant Messaging Protocol Specification](/09-anp-e2ee-instant-messaging-protocol-specification.md)).
 > 3. AgentDescription is a newly added service type to support the discovery of agent description documents.
-> 4. For scenarios requiring end-to-end encrypted communication, a key separation design is recommended: signing keys (ECDSA secp256r1 or secp256k1) and key agreement keys (X25519) should be managed separately. Signing keys should not participate in key agreement, and key agreement keys should not participate in signing. For detailed E2EE protocol design, see [09-ANP E2EE Instant Messaging Protocol Specification](/09-anp-e2ee-instant-messaging-protocol-specification.md).
+> 4. HandleService is a newly added service type to support bidirectional binding verification between WNS (WBA Name Space) Handles and DIDs. By adding a HandleService entry in the DID Document's service section, the DID holder declares their associated Handle, allowing verifiers to check the consistency of mappings in both directions: Handle → DID (via Handle Provider) and DID → Handle (via DID Document). See [04-ANP-DID:WBA Name Space Specification](04-anp-did-wba-name-space-specification.md) for details.
+> 5. For scenarios requiring end-to-end encrypted communication, a key separation design is recommended: signing keys (ECDSA secp256r1 or secp256k1) and key agreement keys (X25519) should be managed separately. Signing keys should not participate in key agreement, and key agreement keys should not participate in signing. For detailed E2EE protocol design, see [09-ANP E2EE Instant Messaging Protocol Specification](/09-anp-e2ee-instant-messaging-protocol-specification.md).
 
 ### 2.5 DID Method Operations
 

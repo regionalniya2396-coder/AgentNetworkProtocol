@@ -135,6 +135,11 @@ did:wba:example.com%3A3000
         "id": "did:wba:example.com%3A8800:user:alice#ad",
         "type": "AgentDescription",
         "serviceEndpoint": "https://agent-network-protocol.com/agents/example/ad.json"
+      },
+      {
+        "id": "did:wba:example.com%3A8800:user:alice#handle",
+        "type": "HandleService",
+        "serviceEndpoint": "https://example.com/.well-known/handle/alice"
       }
     ]
 }
@@ -176,14 +181,17 @@ did:wba:example.com%3A3000
 
 - **service**: 可选字段，定义了与DID主体关联的服务列表。
   - **id**: 服务的唯一标识符。
-  - **type**: 服务类型。对于智能体描述服务，使用"AgentDescription"。
-  - **serviceEndpoint**: 服务的端点URL。对于智能体描述服务，此URL指向遵循[ANP-智能体描述协议规范](/chinese/07-ANP-智能体描述协议规范.md)的文档。
+  - **type**: 服务类型。目前支持以下类型：
+    - `AgentDescription`：智能体描述服务，`serviceEndpoint` 指向遵循[ANP-智能体描述协议规范](/chinese/07-ANP-智能体描述协议规范.md)的文档。
+    - `HandleService`：Handle 绑定服务，用于 WNS（WBA Name Space）双向绑定验证。`serviceEndpoint` 指向 Handle Resolution Endpoint（如 `https://example.com/.well-known/handle/alice`）。通过在 DID Document 中声明 HandleService，DID 持有者确认其与指定 Handle 的绑定关系，验证者可据此完成双向验证，防止 Handle Provider 单方面篡改映射。详见 [04-ANP-基于DID-WBA的命名空间规范](04-ANP-基于DID-WBA的命名空间规范.md)。
+  - **serviceEndpoint**: 服务的端点URL。
 
 > 注意：
 > 1. 公钥信息目前支持两种格式，publicKeyJwk和publicKeyMultibase。详细见[https://www.w3.org/TR/did-extensions-properties/#verification-method-properties](https://www.w3.org/TR/did-extensions-properties/#verification-method-properties)。
 > 2. 验证方法类型定义见[https://www.w3.org/TR/did-extensions-properties/#verification-method-types](https://www.w3.org/TR/did-extensions-properties/#verification-method-types)。目前支持的类型有：EcdsaSecp256k1VerificationKey2019、EcdsaSecp256r1VerificationKey2019、Ed25519VerificationKey2018、Ed25519VerificationKey2020、X25519KeyAgreementKey2019。其中，EcdsaSecp256r1VerificationKey2019 用于端到端加密场景中的签名验证（详见 [09-ANP-端到端即时消息协议规范](09-ANP-端到端即时消息协议规范.md)）。
 > 3. AgentDescription是一个新增的服务类型，用于支持智能体描述文档的发现。
-> 4. 对于需要支持端到端加密通信的场景，建议采用密钥分离设计：签名密钥（ECDSA secp256r1 或 secp256k1）与密钥协商密钥（X25519）分开管理。签名密钥不参与密钥协商，密钥协商密钥不参与签名。详细的 E2EE 协议设计参见 [09-ANP-端到端即时消息协议规范](09-ANP-端到端即时消息协议规范.md)。
+> 4. HandleService是一个新增的服务类型，用于支持 WNS（WBA Name Space）Handle 与 DID 的双向绑定验证。DID 持有者通过在 DID Document 的 service 中添加 HandleService 条目，声明其关联的 Handle，使验证者可以同时检查 Handle → DID（通过 Handle Provider）和 DID → Handle（通过 DID Document）两个方向的映射一致性。详见 [04-ANP-基于DID-WBA的命名空间规范](04-ANP-基于DID-WBA的命名空间规范.md)。
+> 5. 对于需要支持端到端加密通信的场景，建议采用密钥分离设计：签名密钥（ECDSA secp256r1 或 secp256k1）与密钥协商密钥（X25519）分开管理。签名密钥不参与密钥协商，密钥协商密钥不参与签名。详细的 E2EE 协议设计参见 [09-ANP-端到端即时消息协议规范](09-ANP-端到端即时消息协议规范.md)。
 
 ### 2.5 DID方法操作
 
